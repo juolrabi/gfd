@@ -1,0 +1,35 @@
+/*
+Form.hpp introduce struct FormGrade and acronyms Form, Hodge, and Derivative
+*/
+
+#ifndef _FORM_HPP_INCLUDED_
+#define _FORM_HPP_INCLUDED_
+
+#include "Column.hpp"
+
+namespace gfd
+{
+
+enum FormGrade
+{
+	fg_prim0, fg_dual0,
+	fg_prim1, fg_dual1,
+	fg_prim2, fg_dual2,
+	fg_prim3, fg_dual3,
+	fg_prim4, fg_dual4,
+	fg_num
+};
+inline uint FormGradeDimension(const FormGrade grade) { return uint(grade >> 1); }
+inline bool FormGradeIsPrim(const FormGrade grade) { return bool(~grade & 1); }
+inline bool FormGradeIsDual(const FormGrade grade) { return bool(grade & 1); }
+inline FormGrade FormGradeDual(const FormGrade grade) { return FormGrade(grade ^ 1); }
+inline FormGrade FormGradeDeriv(const FormGrade grade) { return FormGrade(FormGradeIsPrim(grade) ? grade + 2 : grade - 2); }
+
+template <typename T> using Form = Column<T>;
+template <typename T> using Hodge = Diagonal<T>;
+using Derivative = Sparse<sign>;
+
+
+};
+
+#endif //_DEC_HPP_INCLUDED_

@@ -1,0 +1,1 @@
+mpicxx -O3 -o Run Main/*.cpp *.cpp ../Mesh/*.cpp ../Output/*.cpp ../Types/*.cpp -std=c++11
