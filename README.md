@@ -6,6 +6,8 @@ The source code implements a library for the neccessary concepts and algorithms.
 
 The development of the library has been active and in use since 2012 and is still under construction. There are several existing simulation results generated with this code or with previous versions of it. For more details, see [the projects web page](https://sites.google.com/jyu.fi/gfd).
 
+The code in this repository is free software and licensed under the GNU General Public License version 3.
+
 Author of this project is Jukka Räbinä, who currently works in the 
 - Faculty of Information Technology at the University of Jyväskylä.
 
