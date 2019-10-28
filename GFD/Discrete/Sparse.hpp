@@ -19,9 +19,9 @@ class Sparse : public Discrete<T>
 public:
 	// constructors
 	Sparse(const T &zero = 0) : Discrete<T>::Discrete(zero) { m_width = 0; } // initialize empty sparse matrix
-	template<typename R> Sparse(const Sparse<R> &r) : Discrete<T>::m_zero(r.m_zero) { setCopy(r); } // copy existing sparse matrix
-	Sparse(const uint width, const Buffer< Buffer< pair<uint, T> > > &val, const T &zero) : Discrete<T>::m_zero(zero) { setFull(width, val); } // initialize full sparse matrix
-	Sparse(const uint width, const uint height, const Buffer< pair<uint, Buffer< pair<uint, T> > > > &val, const T &zero) : Discrete<T>::m_zero(zero) { setSparse(width, height, val); } // initialize sparse sparse matrix
+	template<typename R> Sparse(const Sparse<R> &r) : Discrete<T>::Discrete(r.m_zero) { setCopy(r); } // copy existing sparse matrix
+	Sparse(const uint width, const Buffer< Buffer< pair<uint, T> > > &val, const T &zero) : Discrete<T>::Discrete(zero) { setFull(width, val); } // initialize full sparse matrix
+	Sparse(const uint width, const uint height, const Buffer< pair<uint, Buffer< pair<uint, T> > > > &val, const T &zero) : Discrete<T>::Discrete(zero) { setSparse(width, height, val); } // initialize sparse sparse matrix
 	virtual ~Sparse() { }
 
 	// print functions
@@ -56,7 +56,6 @@ public:
 		sendMPI(&col1, sizeof(uint), (irank + 1) % ranks, 0);
 		uint totalwidth = 0;
 		if(irank == 0) recvMPI(&totalwidth, sizeof(uint), ranks - 1, 0);
-
 
 		Buffer< Buffer< pair<uint,T> > > buf(this->m_height);
 		Buffer<uint> row = this->m_row;
@@ -314,7 +313,8 @@ public:
 		this->m_height = rwidth;
 		this->m_full = true;
 		this->m_row.clear();
-		return *this;
+		if(r.m_full) return *this;
+		return toSparse();
 	}
 	template<typename L, typename R> Sparse &setPlus(const Sparse<L> &l, const Sparse<R> &r) { return setUnion(l, r, functionPlus); }
 	template<typename L, typename R> Sparse &setMinus(const Sparse<L> &l, const Sparse<R> &r) { return setUnion(l, r, functionMinus); }
@@ -402,7 +402,7 @@ public:
 				for(k=0; k<rsize; k++) sumTerm(pair<uint,T>(r.m_col[rbeg+k], lval * r.m_val[rbeg+k]), bufi);
 
 				const Buffer< pair<pair<uint,uint>,R> > &rrext = rext[rrow];
-				for(k=0; k<rrext.size(); k++) sumTerm(r.getTerm(rrext[k].first, lval * rrext[k].second, ext), bufi);
+				for(k=0; k<rrext.size(); k++) sumTerm(getTerm(rrext[k].first, lval * rrext[k].second, r.m_width, ext), bufi);
 			}
 		}
 		// receive external rows
@@ -425,8 +425,8 @@ public:
 				for(k=l.m_recv[i++]; k>0; k--, i++, n++) {
 					const L &lval = l.m_rval[n];
 					Buffer< pair<uint,T> > &bufi = buf[l.m_recv[i]];
-					for(m=0; m<rsize; m++) sumTerm(r.getTerm(pair<uint,uint>(ranki,rrloc[m].first), lval * rrloc[m].second, ext), bufi);
-					for(m=0; m<rrext.size(); m++) sumTerm(r.getTerm(rrext[m].first, lval * rrext[m].second, ext), bufi);
+					for(m=0; m<rsize; m++) sumTerm(getTerm(pair<uint,uint>(ranki,rrloc[m].first), lval * rrloc[m].second, r.m_width, ext), bufi);
+					for(m=0; m<rrext.size(); m++) sumTerm(getTerm(rrext[m].first, lval * rrext[m].second, r.m_width, ext), bufi);
 				}
 				for(m=0; m<rrext.size(); m++) {
 					const uint irank = rrext[m].first.first;
@@ -452,13 +452,9 @@ public:
 		srank.resize(sranks);
 		rrank.resize(rranks);
 		// initialize the product matrix
-		if(l.m_full) return setFull(r.m_width, buf, bext, srank, rrank);
-		Buffer< pair<uint, Buffer< pair<uint, T> > > > sbuf(buf.size());
-		for(i=0; i<buf.size(); i++) {
-			sbuf[i].first = l.m_row[i];
-			sbuf[i].second.swap(buf[i]);
-		}
-		return setSparse(r.m_width, l.m_height, sbuf, bext, srank, rrank);
+		setFull(r.m_width, buf, bext, srank, rrank);
+		if(l.m_full && r.m_full) return *this;
+		return toSparse();
 	}
 	template<typename L, typename R> Sparse &setTimes(const Diagonal<L> &l, const Sparse<R> &r) {
 		if(orMPI(l.m_height != r.m_height)) return setEmpty(); // the dimensions do not match
@@ -485,6 +481,7 @@ public:
 		}
 		// l is a sparse diagonal matrix
 		if(this != (void*)&r) { // this and r are not equal -> initialize this
+			this->m_full = true;
 			m_width = r.m_width;
 			this->m_height = r.m_height;
 			m_beg.resize(r.m_beg.size());
@@ -496,22 +493,26 @@ public:
 		}
 		uint rows = 0;
 		uint cols = 0;
-		this->m_row.resize(r.m_beg.size());
-		Buffer<L *> lval(r.m_beg.size(), NULL);
+		if(this->m_full) this->m_row.resize(l.m_row.size());
+		Buffer<uint> lto(r.m_beg.size(), uint(-1));
 		Buffer<uint> rto(r.m_beg.size());
-		for(i=0; i<r.m_beg.size(); i++) {
-			uint row = (r.m_full ? i : r.m_row[i]);
-			if(!Discrete<T>::searchIndex(row, l.m_row, 0, l.m_row.size())) continue;
-			const uint j0 = r.m_beg[i];
-			const uint j1 = (i+1<r.m_beg.size() ? r.m_beg[i+1] : r.m_col.size());
-			rto[i] = rows;
-			lval[i] = &l.m_val[row];
-			this->m_row[rows] = l.m_row[row];
+		for(i=0,j=0; i<l.m_row.size(); i++) {
+			const uint row = l.m_row[i];
+			if(r.m_full) j = row;
+			else {
+				while(j < r.m_row.size() && r.m_row[j] < row) j++;
+				if(j >= r.m_row.size() || r.m_row[j] > row) continue;
+			}
+			lto[j] = i;
+			rto[j] = rows;
+			this->m_row[rows] = row;
 			m_beg[rows] = cols;
 			rows++;
-			for(j=j0; j<j1; j++) {
-				m_col[cols] = r.m_col[j];
-				this->m_val[cols] = (*lval[i]) * r.m_val[j];
+			const uint k0 = r.m_beg[j];
+			const uint k1 = (j+1<r.m_beg.size() ? r.m_beg[j+1] : r.m_col.size());
+			for(k=k0; k<k1; k++) {
+				m_col[cols] = r.m_col[k];
+				this->m_val[cols] = l.m_val[i] * r.m_val[k];
 				cols++;
 			}
 		}
@@ -532,8 +533,8 @@ public:
 				uint copys = 0;
 				const uint recvCopys = recvs++;
 				for(k=r.m_recv[i++]; k>0; k--,i++,n++) {
-					if(lval[r.m_recv[i]] == NULL) continue;
-					m_rval[rvals++] = (*lval[r.m_recv[i]]) * r.m_rval[n];
+					if(lto[r.m_recv[i]] == uint(-1)) continue;
+					m_rval[rvals++] = l.m_val[lto[r.m_recv[i]]] * r.m_rval[n];
 					m_recv[recvs++] = rto[r.m_recv[i]];
 					copys++;
 				}
@@ -553,6 +554,7 @@ public:
 		}
 		m_recv.resize(recvs);
 		m_rval.resize(rvals);
+		lto.clear();
 		rto.clear();
 		// trim m_send
 		uint sends = 0;
@@ -673,7 +675,7 @@ public:
 		}
 		m_recv.resize(recvs);
 		m_rval.resize(rvals);
-		return *this;
+		return toSparse();
 	}
 	template<typename L, typename R> Sparse &setScaleRight(const Sparse<L> &l, const R &r) {
 		if(this != (void*)&l) setShape(l);
@@ -698,85 +700,6 @@ public:
 	template<typename R> Sparse &scaleRight(const R &r) { return setScaleRight(*this, r); } // multiply from right by a scalar
 	template<typename L> Sparse &scaleLeft(const L &l) { return setScaleLeft(l, *this); } // multiply from left by a scalar
 
-/*	template<typename R, typename O> bool sumMatrixTimesVector(const Column<R> &r, Column<O> &o) const {
-		if(m_width != r.m_height) return false; // the dimensions do not match
-		uint i, j, k, n;
-		if(r.m_full) {
-			// send terms
-			for(i=0; i<m_send.size(); ) {
-				const uint ranki = m_send[i++];
-				Buffer<R> val(j = m_send[i++]);
-				while(j > 0) val[--j] = r.m_val[m_send[i++]];
-				sendMPI(&val[0], val.size() * sizeof(R), ranki, 0);
-			}
-			// local terms
-			i = m_beg.size();
-			j = m_col.size();
-			if(this->m_full) { if(!o.m_full || o.m_height != i) o.initFullVectorOfZeros(i); }
-			else if(o.m_full || o.m_row != this->m_row) o.initSparseVectorOfZeros(this->m_height, this->m_row);
-			while(i > 0) {
-				O &sum = o.m_val[--i];
-				while(j > m_beg[i]) { --j; sum += this->m_val[j] * r.m_val[m_col[j]]; }
-			}
-			// receive terms
-			for(i=0,n=0; i<m_recv.size(); )	{
-				const uint ranki = m_recv[i++];
-				Buffer<R> val(j = m_recv[i++]);
-				recvMPI(&val[0], val.size() * sizeof(R), ranki, 0);
-				while(j > 0) {
-					const R &valj = val[--j];
-					for(k=m_recv[i++]; k>0; k--,i++,n++) o.m_val[m_recv[i]] += m_rval[n] * valj;
-				}
-			}
-			return true;
-		}
-		// send sparse data
-		for(i=0; i<m_send.size(); ) {
-			const uint ranki = m_send[i++];
-			uint vals = 0;
-			Buffer<pair<uint,R> > val(m_send[i++]);
-			for(j=0; j<val.size(); j++) {
-				uint row = m_send[i++];
-				if(!searchIndex(row, r.m_row, 0, r.m_row.size())) continue;
-				val[vals++] = pair<uint,R>(j, r.m_val[row]);
-			}
-			sendMPI(&vals, sizeof(uint), ranki, 0);
-			if(vals > 0) sendMPI(&val[0], vals * sizeof(pair<uint,R>), ranki, 1);
-		}
-		// local terms
-		i = m_beg.size();
-		j = m_col.size();
-		if(this->m_full) { if(!o.m_full || o.m_height != i) o.initFullVectorOfZeros(i); }
-		else if(o.m_full || o.m_row != this->m_row) o.initSparseVectorOfZeros(this->m_height, this->m_row);
-		while(i > 0) {
-			O &sum = o.m_val[--i];
-			uint lastcol = r.m_row.size();
-			while(j > m_beg[i]) {
-				uint col = m_col[--j];
-				if(!searchIndex(col, r.m_row, 0, lastcol)) continue;
-				sum += this->m_val[j] * r.m_val[col];
-				lastcol = col;
-			}
-		}
-		// receive sparse data
-		for(i=0,n=0; i<m_recv.size(); )	{
-			const uint ranki = m_recv[i++];
-			const uint sizei = m_recv[i++];
-			uint vals;
-			recvMPI(&vals, sizeof(uint), ranki, 0);
-			if(vals > 0) {
-				Buffer<pair<uint,R> > val(vals);
-				recvMPI(&val[0], vals * sizeof(pair<uint,R>), ranki, 1);
-				for(j=0,vals=0; j<val.size(); j++,vals++) {
-					while(vals < val[j].first) { n += m_recv[i]; i += 1 + m_recv[i]; vals++; } // idle for the next
-					for(k=m_recv[i++]; k>0; k--,i++,n++) o.m_val[m_recv[i]] += m_rval[n] * val[j].second;
-				}
-			}
-			while(vals < sizei) { n += m_recv[i]; i += 1 + m_recv[i]; vals++; } // idle for the next
-		}
-		return true;
-	}
-*/
 	// trim functions
 	Sparse &trimFull() { // convert sparse to full
 		if(this->m_full) return trim(); // already full
@@ -799,32 +722,6 @@ public:
 	}
 	Sparse &trimSparse() { // convert full to sparse
 		if(!this->m_full) return trim(); // already sparse
-/*		uint i, j, k;
-		Buffer<uint> to(this->m_height, 0);
-		for(i=0; i<m_recv.size(); )	{
-			i++;
-			for(j=m_recv[i++]; j>0; j--) {
-				for(k=m_recv[i++]; k>0; k--,i++) to[m_recv[i]] = 1;
-			}
-		}
-		this->m_row.resize(this->m_height);
-		for(i=0,j=0; i<this->m_height; i++) {
-			if(to[i]) to[i] = j;
-			else if((i+1<m_beg.size() ? m_beg[i+1] : m_col.size()) == m_beg[i]) continue;
-			this->m_row[j] = i;
-			m_beg[j] = m_beg[i];
-			j++;
-		}
-		this->m_full = false;
-		this->m_row.resize(j);
-		m_beg.resize(j);
-		for(i=0; i<m_recv.size(); )	{
-			i++;
-			for(j=m_recv[i++]; j>0; j--) {
-				for(k=m_recv[i++]; k>0; k--,i++) m_recv[i] = to[m_recv[i]];
-			}
-		}
-*/
 		this->m_full = false;
 		this->m_row.resize(this->m_height);
 		for(uint i=0; i<this->m_height; i++) this->m_row[i] = i;
@@ -886,31 +783,8 @@ public:
 		while(k<m_beg.size()) m_beg[k++] = j;
 		m_col.resize(j);
 		this->m_val.resize(j);
-		// trim rows
 		if(this->m_full) return *this;
-		Buffer<uint> rrow(this->m_row.size(), uint(-1));
-		for(i=0; i<m_recv.size(); i++) {
-			for(j=m_recv[++i]; j>0; j--) {
-				for(k=m_recv[++i]; k>0; k--) { ++i; rrow[m_recv[i]] = m_recv[i]; }
-			}
-		}
-		for(i=0,j=0; i<this->m_row.size(); i++) {
-			if((i+1<m_beg.size() ? m_beg[i+1] : m_col.size()) == m_beg[i] && rrow[i] != i) continue;
-			if(i != j) {
-				this->m_row[j] = this->m_row[i];
-				m_beg[j] = m_beg[i];
-				rrow[i] = j;
-			}
-			j++;
-		}
-		this->m_row.resize(j);
-		m_beg.resize(j);
-		for(i=0; i<m_recv.size(); i++) {
-			for(j=m_recv[++i]; j>0; j--) {
-				for(k=m_recv[++i]; k>0; k--) { ++i; m_recv[i] = rrow[m_recv[i]]; }
-			}
-		}
-		return *this;
+		return toSparse();
 	}
 
 	// get functions
@@ -931,7 +805,7 @@ public:
 	Buffer<uint> m_recv; // coded data for MPI receive
 	Buffer<T> m_rval; // multiplication terms for MPI receive
 
-//protected:
+protected:
 	Sparse &setEmpty() {
 		Discrete<T>::setVectorEmpty();
 		m_width = 0;
@@ -1366,11 +1240,11 @@ public:
 		for(i=0; i<m_rval.size(); i++) func(m_rval[i], l.m_rval[i], r.m_zero);
 		return *this;
 	}
-	template<typename R> pair<uint,R> getTerm(const pair<uint,uint> &ext, const R &val, map<pair<uint,uint>,uint> &exts) const {
+	template<typename R> pair<uint,R> getTerm(const pair<uint,uint> &ext, const R &val, const uint locs, map<pair<uint,uint>,uint> &exts) const {
 		if(ext.first == getMPIrank()) return pair<uint,R>(ext.second, val);
 		map<pair<uint,uint>,uint>::iterator it = exts.find(ext);
 		if(it != exts.end()) return pair<uint,R>(it->second, val);
-		const uint col = exts.size() + m_width;
+		const uint col = exts.size() + locs;
 		exts.insert(make_pair(ext, col));
 		return pair<uint,R>(col, val);
 	}
@@ -1459,6 +1333,37 @@ public:
 			col[cols] = r.m_col[rj];
 			cols++; rj++;
 		}
+	}
+	Sparse &toSparse() { // make sparse matrix with no empty rows
+		uint i, j, k;
+		if(this->m_full) {
+			this->m_full = false;
+			this->m_row.resize(this->m_height);
+			for(i=0; i<this->m_height; i++) this->m_row[i] = i;
+		}
+		Buffer<uint> rrow(this->m_row.size(), uint(-1));
+		for(i=0; i<m_recv.size(); i++) {
+			for(j=m_recv[++i]; j>0; j--) {
+				for(k=m_recv[++i]; k>0; k--) { ++i; rrow[m_recv[i]] = m_recv[i]; }
+			}
+		}
+		for(i=0,j=0; i<this->m_row.size(); i++) {
+			if((i+1<m_beg.size() ? m_beg[i+1] : m_col.size()) == m_beg[i] && rrow[i] != i) continue;
+			if(i != j) {
+				this->m_row[j] = this->m_row[i];
+				m_beg[j] = m_beg[i];
+				rrow[i] = j;
+			}
+			j++;
+		}
+		this->m_row.resize(j);
+		m_beg.resize(j);
+		for(i=0; i<m_recv.size(); i++) {
+			for(j=m_recv[++i]; j>0; j--) {
+				for(k=m_recv[++i]; k>0; k--) { ++i; m_recv[i] = rrow[m_recv[i]]; }
+			}
+		}
+		return *this;
 	}
 
 

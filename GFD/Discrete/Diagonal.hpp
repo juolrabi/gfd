@@ -18,10 +18,10 @@ class Diagonal : public Discrete<T>
 public:
 	// constructors
 	Diagonal(const T &zero = 0) : Discrete<T>::Discrete(zero) { } // initialize empty diagonal matrix
-	template<typename R> Diagonal(const Diagonal<R> &r) : Discrete<T>::m_zero(r.m_zero) { setCopy(r); } // copy existing diagonal matrix
-	Diagonal(const uint height, const T &zero) : Discrete<T>::m_zero(zero) { setFullOfZeros(height); } // initialize full diagonal matrix with given height
-	Diagonal(const Buffer<T> &val, const T &zero) : Discrete<T>::m_zero(zero) { setFull(val); } // initialize full diagonal matrix
-	Diagonal(const uint height, const Buffer< pair<uint, T> > &val, const T &zero) : Discrete<T>::m_zero(zero) { setSparse(height, val); } // initialize sparse diagonal matrix
+	template<typename R> Diagonal(const Diagonal<R> &r) : Discrete<T>::Discrete(r.m_zero) { setCopy(r); } // copy existing diagonal matrix
+	Diagonal(const uint height, const T &zero) : Discrete<T>::Discrete(zero) { setFullOfZeros(height); } // initialize full diagonal matrix with given height
+	Diagonal(const Buffer<T> &val, const T &zero) : Discrete<T>::Discrete(zero) { setFull(val); } // initialize full diagonal matrix
+	Diagonal(const uint height, const Buffer< pair<uint, T> > &val, const T &zero) : Discrete<T>::Discrete(zero) { setSparse(height, val); } // initialize sparse diagonal matrix
 	virtual ~Diagonal() { }
 
 	// print functions
