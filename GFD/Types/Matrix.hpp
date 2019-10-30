@@ -1002,12 +1002,13 @@ public:
 			}
 		}
 		for(i=n; i-->0; ) {
-			const double div = 1.0 / u[i][i];
+			double div = 1.0 / u[i][i];
 			for(j=0; j<i; j++) {
 				double &uji = u[j][i];
 				uji *= -div;
 				for(k=i+1; k<n; k++) u[j][k] += uji * u[i][k];
 			}
+			div *= d;
 			u[i][i] = div;
 			for(j=i+1; j<n; j++) u[i][j] *= div;
 		}
@@ -1131,6 +1132,6 @@ const SymThreeMatrix4 ZEROSYMTHREEMATRIX4(0,0,0,0,0,0,0,0,0,0);
 const SymFourMatrix4 IDENTITYSYMFOURMATRIX4(1);
 const SymFourMatrix4 ZEROSYMFOURMATRIX4(0);
 
-};
+}
 
 #endif //_MATRIX_HPP_INCLUDED_

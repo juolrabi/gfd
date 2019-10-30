@@ -409,6 +409,6 @@ protected:
   T *m_data;
 };
 
-};
+}
 
 #endif //_BUFFER_HPP_INCLUDED_

@@ -130,6 +130,6 @@ public:
 	Complex t;
 };
 
-};
+}
 
 #endif //_COMPLEX_HPP_INCLUDED_

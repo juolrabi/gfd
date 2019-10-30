@@ -10,12 +10,11 @@ Text is able to print, load, and save
 #include <string>
 #include <sstream>
 
+namespace gfd
+{
+
 class Text : public std::stringstream
 {
-private:
-  Text(const Text &rhs) { *this = rhs; }
-  Text &operator = (const Text &rhs) { return *this; }
-
 public:
   Text() {}
   virtual ~Text() {}
@@ -33,5 +32,7 @@ public:
 	const std::string getRow();
 
 };
+
+}
 
 #endif //_TEXT_HPP_INCLUDED_

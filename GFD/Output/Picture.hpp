@@ -14,10 +14,6 @@ namespace gfd
 
 class Picture
 {
-private:
-	Picture(const Picture &rhs) { *this = rhs; }
-	Picture &operator = (const Picture &rhs) { return *this; }
-
 public:
 	Picture(const uint width = 1, const uint height = 1) { init(width, height); }
 	virtual ~Picture() { clear(); }
@@ -53,6 +49,6 @@ protected:
 	Buffer<Vector4> m_pixels; // pixels of the picture
 };
 
-};
+}
 
 #endif //_PICTURE_HPP_INCLUDED_

@@ -210,7 +210,7 @@ public:
 	ThreeVector3 &increase(const ThreeVector3 &v) { xyz += v.xyz; return (*this); }
 	ThreeVector3 &decrease(const ThreeVector3 &v) { xyz -= v.xyz; return (*this); }
 	ThreeVector3 &scale(const double d) { xyz *= d; return (*this); }
-	ThreeVector3 product(const ThreeVector3 &v) const { return ThreeVector3(xyz); }
+	ThreeVector3 product(const ThreeVector3 &v) const { return ThreeVector3(v.xyz * xyz); }
 	ThreeVector3 inverse(const double d = 1.0) const { return ThreeVector3(d / xyz); }
 	bool equals(const ThreeVector3 &v) const { return (xyz == v.xyz); }
 	double dot(const ThreeVector3 &v) const { return xyz * v.xyz; }
@@ -482,6 +482,6 @@ public:
 	Buffer<double> val;
 };
 
-};
+}
 
 #endif //_VECTOR_HPP_INCLUDED_

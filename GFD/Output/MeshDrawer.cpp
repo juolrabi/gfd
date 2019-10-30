@@ -77,7 +77,7 @@ void MeshDrawer::drawDualEdges(const Mesh &mesh, const Vector3 &col, const UintS
 	}
 }
 
-void MeshDrawer::drawBoundaryFaces(const Mesh &mesh, const Vector3 &col, const Vector4 &proj, const UintSet &flag)
+void MeshDrawer::drawBoundaryFaces(const Mesh &mesh, const Vector3 &col, const UintSet &flag)
 {
 	uint i, j;
 	uint fs = 0;
@@ -124,12 +124,8 @@ void MeshDrawer::drawBoundaryFaces(const Mesh &mesh, const Vector3 &col, const V
 		Buffer<Vector4> np(n.size());
 		Buffer<Vector3> nc(n.size());
 
-		//const Vector4 fp = mesh.getFaceAverage(f[i]);
-		//const Vector4 d = mesh.getFaceOrthogonal(f[i], mesh.getBodyAverage(f[i]) - fp);
-		//const bool way = (mesh.getFaceAverage(f[i]) - getPosition()).dot(mesh.getFaceVector(f[i], proj)) > 0.0;
 		for(j=0; j<n.size(); j++)
 		{
-			//const uint k = (way ? j : n.size() - j - 1);
 			np[j] = mesh.getNodePosition(n[j]);
 			nc[j] = col; // sininen
 		}
@@ -137,7 +133,7 @@ void MeshDrawer::drawBoundaryFaces(const Mesh &mesh, const Vector3 &col, const V
 	}
 }
 
-void MeshDrawer::drawBoundaryFaces(const Mesh &mesh, const Buffer<Vector3> &col, const Vector4 &proj, const UintSet &flag)
+void MeshDrawer::drawBoundaryFaces(const Mesh &mesh, const Buffer<Vector3> &col, const UintSet &flag)
 {
 	uint i, j;
 	uint fs = 0;
@@ -180,12 +176,8 @@ void MeshDrawer::drawBoundaryFaces(const Mesh &mesh, const Buffer<Vector3> &col,
 		Buffer<Vector4> np(n.size());
 		Buffer<Vector3> nc(n.size());
 
-		//const Vector4 fp = mesh.getFaceAverage(f[i]);
-		//const Vector4 d = mesh.getFaceOrthogonal(f[i], mesh.getBodyAverage(f[i]) - fp);
-		//const bool way = (mesh.getFaceAverage(f[i]) - getPosition()).dot(mesh.getFaceVector(f[i], proj)) > 0.0;
 		for(j=0; j<n.size(); j++)
 		{
-			//const uint k = (way ? j : n.size() - j - 1);
 			np[j] = mesh.getNodePosition(n[j]);
 			nc[j] = col[f[i]];
 		}
@@ -193,7 +185,7 @@ void MeshDrawer::drawBoundaryFaces(const Mesh &mesh, const Buffer<Vector3> &col,
 	}
 }
 
-void MeshDrawer::drawBoundaryFacesByNodeColor(const Mesh &mesh, const Buffer<Vector3> &col, const Vector4 &proj, const UintSet &flag)
+void MeshDrawer::drawBoundaryFacesByNodeColor(const Mesh &mesh, const Buffer<Vector3> &col, const UintSet &flag)
 {
 	uint i, j;
 	uint fs = 0;
@@ -236,12 +228,8 @@ void MeshDrawer::drawBoundaryFacesByNodeColor(const Mesh &mesh, const Buffer<Vec
 		Buffer<Vector4> np(n.size());
 		Buffer<Vector3> nc(n.size());
 
-		//const Vector4 fp = mesh.getFaceAverage(f[i]);
-		//const Vector4 d = mesh.getFaceOrthogonal(f[i], mesh.getBodyAverage(f[i]) - fp);
-		//const bool way = (mesh.getFaceAverage(f[i]) - getPosition()).dot(mesh.getFaceVector(f[i], proj)) > 0.0;
 		for(j=0; j<n.size(); j++)
 		{
-			//const uint k = (way ? j : n.size() - j - 1);
 			np[j] = mesh.getNodePosition(n[j]);
 			nc[j] = col[n[j]];
 		}

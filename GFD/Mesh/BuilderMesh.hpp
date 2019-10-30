@@ -103,6 +103,6 @@ protected:
 
 };
 
-};
+}
 
 #endif //_BUILDERMESH_HPP_INCLUDED_

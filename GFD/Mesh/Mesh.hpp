@@ -53,8 +53,8 @@ public:
 	void swap(Mesh &mesh);
 
 	// load and save mesh
-	bool loadMesh(const std::string &path);
-	bool saveMesh(const std::string &path) const;
+	//bool loadMesh(const std::string &path);
+	//bool saveMesh(const std::string &path) const;
 	bool loadJRMesh(const std::string &path);
 	bool saveJRMesh(const std::string &path) const;
 
@@ -362,6 +362,6 @@ public:
 */
 };
 
-};
+}
 
 #endif //_MESH_HPP_INCLUDED_

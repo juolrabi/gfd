@@ -89,9 +89,9 @@ void Mesh::swap(Mesh &mesh)
 	m_w.swap(mesh.m_w);
 }
 
-bool Mesh::loadMesh(const std::string &path)
+/*bool Mesh::loadMesh(const std::string &path)
 {
-/*	std::ifstream fs(path.c_str(), std::ios::in);
+	std::ifstream fs(path.c_str(), std::ios::in);
 	if(fs.fail() != 0) return false;
 
 	clear();
@@ -229,7 +229,7 @@ bool Mesh::loadMesh(const std::string &path)
 	}
 
 	fs.close();
-*/	return true;
+	return true;
 }
 bool Mesh::saveMesh(const std::string &path) const
 {
@@ -294,7 +294,7 @@ bool Mesh::saveMesh(const std::string &path) const
 
 	return true;
 }
-
+*/
 bool Mesh::loadJRMesh(const std::string &path)
 {
 	std::ifstream fs(path.c_str(), std::ios::binary | std::ios::in);

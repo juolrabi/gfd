@@ -1,1 +1,0 @@
-mpiCC -O3 -o Run *.cpp ../Mesh/*.cpp ../Output/*.cpp ../Types/*.cpp

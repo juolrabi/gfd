@@ -56,6 +56,6 @@ protected:
 
 };
 
-};
+}
 
 #endif //_CAMERA_HPP_INCLUDED_

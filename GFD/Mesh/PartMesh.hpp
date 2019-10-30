@@ -78,6 +78,6 @@ protected:
 	Buffer< pair<uint,uint> > m_extq;
 };
 
-};
+}
 
 #endif //_PARTMESH_HPP_INCLUDED_

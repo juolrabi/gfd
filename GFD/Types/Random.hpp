@@ -24,53 +24,43 @@ const uint MT_N = 624;
 
 class Random
 {
-private:
-  Random(const Random &rhs) { *this = rhs; }
-  Random &operator = (const Random &rhs) { return *this; }
-
 public:
-  Random() { init(++ms_seed); }
-  Random(const uint seed) { init(seed); }
-  virtual ~Random() {}
+	Random() { init(++ms_seed); }
+	Random(const uint seed) { init(seed); }
+	virtual ~Random() {}
 
-  // Initialise the generator from a seed
-  void init(const uint seed);
+	// Initialise the generator from a seed
+	void init(const uint seed);
 
-  // Returns pseudorandom 32-bit unsigned int.
-  uint getUint();
+	// Returns pseudorandom 32-bit unsigned int.
+	uint getUint();
 
-  // Returns pseudorandom number of uniform distribution [0,1[.
-  double getUniform();
+	// Returns pseudorandom number of uniform distribution [0,1[.
+	double getUniform();
 
-  // Returns pseudorandom number of exponentian distr. exp(-x), x > 0.
-  double getExponential();
+	// Returns pseudorandom number of exponentian distr. exp(-x), x > 0.
+	double getExponential();
 
-  // Returns pseudorandom number of standard normal distr. exp(-0.5*x^2)/sqrt(dPIx2), x > 0.
-  double getGaussian();
+	// Returns pseudorandom number of standard normal distr. exp(-0.5*x^2)/sqrt(dPIx2), x > 0.
+	double getGaussian();
 
-  // Returns pseudorandom uniformly distributed vector where x^2 + y^2 <= 1.0.
-  Vector2 getUniformSphere2();
+	// Returns pseudorandom uniformly distributed vector where x^2 + y^2 <= 1.0.
+	Vector2 getUniformSphere2();
 
-  // Returns pseudorandom uniformly distributed vector where x^2 + y^2 + z^2 <= 1.0.
-  Vector3 getUniformSphere3();
+	// Returns pseudorandom uniformly distributed vector where x^2 + y^2 + z^2 <= 1.0.
+	Vector3 getUniformSphere3();
 
-  // Returns pseudorandom uniformly distributed vector where x^2 + y^2 + z^2 + t^2 <= 1.0.
-  Vector4 getUniformSphere4();
+	// Returns pseudorandom uniformly distributed vector where x^2 + y^2 + z^2 + t^2 <= 1.0.
+	Vector4 getUniformSphere4();
 
-  // Sets static seed where Random objects can be generated.
-  static void setStaticSeed(const uint seed) { ms_seed = seed; }
+	// Sets static seed where Random objects can be generated.
+	static void setStaticSeed(const uint seed) { ms_seed = seed; }
 
-private:
-  inline void generateNumbers();
-  inline void generateGaussians();
+protected:
+	uint m_mt[MT_N]; // state vector
+	uint m_i;          // index into mt
 
-  uint m_mt[MT_N]; // state vector
-  uint m_i;          // index into mt
-
-  double m_gaus[2];
-  uint m_iGaus;
-
-  static uint ms_seed;
+	static uint ms_seed;
 };
 
 }

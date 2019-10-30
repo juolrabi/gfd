@@ -89,6 +89,6 @@ protected:
 
 };
 
-};
+}
 
 #endif //_DELAUNAYMESH_HPP_INCLUDED_

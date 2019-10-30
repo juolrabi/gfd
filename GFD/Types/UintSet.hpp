@@ -64,6 +64,6 @@ protected:
 
 const UintSet UINTSETALL(0, uint(-1), 0);
 
-};
+}
 
 #endif //_UINTSET_HPP_INCLUDED_

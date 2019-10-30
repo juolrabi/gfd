@@ -50,6 +50,6 @@ const uint NONE = uint(-1);
 const double PI = 3.1415926535897932385;
 const double PIx2 = 6.2831853071795864770;
 
-};
+}
 
 #endif //_TYPES_HPP_INCLUDED_

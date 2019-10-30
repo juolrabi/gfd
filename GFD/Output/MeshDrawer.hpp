@@ -19,14 +19,14 @@ public:
 	void drawPrimalEdges(const Mesh &mesh, const Vector3 &col = Vector3(1,1,1), const UintSet &flag = UINTSETALL);
 	void drawDualEdges(const Mesh &mesh, const Vector3 &col = Vector3(1,1,1), const UintSet &flag = UINTSETALL);
 
-	void drawBoundaryFaces(const Mesh &mesh, const Vector3 &col = Vector3(1,1,1), const Vector4 &proj = Vector4(0,0,0,1), const UintSet &flag = UINTSETALL);
-	void drawBoundaryFaces(const Mesh &mesh, const Buffer<Vector3> &col, const Vector4 &proj = Vector4(0,0,0,1), const UintSet &flag = UINTSETALL);
-	void drawBoundaryFacesByNodeColor(const Mesh &mesh, const Buffer<Vector3> &col, const Vector4 &proj = Vector4(0,0,0,1), const UintSet &flag = UINTSETALL);
+	void drawBoundaryFaces(const Mesh &mesh, const Vector3 &col = Vector3(1,1,1), const UintSet &flag = UINTSETALL);
+	void drawBoundaryFaces(const Mesh &mesh, const Buffer<Vector3> &col, const UintSet &flag = UINTSETALL);
+	void drawBoundaryFacesByNodeColor(const Mesh &mesh, const Buffer<Vector3> &col, const UintSet &flag = UINTSETALL);
 
 protected:
 
 };
 
-};
+}
 
 #endif //_MESHDRAWER_HPP_INCLUDED_

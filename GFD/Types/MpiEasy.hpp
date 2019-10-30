@@ -1,22 +1,11 @@
 #ifndef _MPIEASY_HPP_INCLUDED_
 #define _MPIEASY_HPP_INCLUDED_
 
-#include "Types.hpp"
+#include "../Types/Types.hpp"
 
 namespace gfd
 {
 
-/*struct External
-{
-	uint part;
-	uint link;
-	External() {}
-	External(const uint apart, const uint alink) {
-		part = apart;
-		link = alink;
-	}
-};
-*/
 void initMPI();
 void finalizeMPI();
 uint getMPIrank();
@@ -36,6 +25,6 @@ void maxMPI(ullong *sum, const uint size);
 void maxMPI(double *sum, const uint size);
 void barrierMPI();
 
-};
+}
 
 #endif //_MPIEASY_HPP_INCLUDED_

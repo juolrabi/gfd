@@ -2,6 +2,8 @@
 #include <fstream>
 #include <cstdlib>
 
+using namespace gfd;
+
 static const uint MAXLINEWIDTH = 4096;
 
 void Text::clear()
