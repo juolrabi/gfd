@@ -11,20 +11,7 @@ using namespace std;
 
 namespace gfd
 {
-/*
-struct External
-{
-	uint part;
-	uint link;
-	External() {}
-	External(const uint apart, const uint alink)
-	{
-		part = apart;
-		link = alink;
-	}
-	bool operator<(const External &e) const { return part < e.part || (part == e.part && link < e.link); }
-};
-*/
+
 class PartMesh : public Mesh
 {
 public:
@@ -33,6 +20,9 @@ public:
 	void clear();
 
 	void createPartFromFlags(const Mesh &mesh);
+	void createPart(const Mesh &mesh, const Buffer<uint> &npart, 
+		const Buffer<uint> &epart = Buffer<uint>(), const Buffer<uint> &fpart = Buffer<uint>(), 
+		const Buffer<uint> &bpart = Buffer<uint>(), const Buffer<uint> &qpart = Buffer<uint>());
 	void createCombined(Buffer<const PartMesh *> &mesh);
 
 	uint getPart() const { return m_part; }

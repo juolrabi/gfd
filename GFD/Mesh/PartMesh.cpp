@@ -132,6 +132,180 @@ void PartMesh::createPartFromFlags(const Mesh &mesh)
 	}
 }
 
+void PartMesh::createPart(const Mesh &mesh, const Buffer<uint> &npart, 
+		const Buffer<uint> &epart, const Buffer<uint> &fpart, 
+		const Buffer<uint> &bpart, const Buffer<uint> &qpart) {
+	uint i, j;
+	clear();
+	
+	const uint nsize = mesh.getNodeSize();
+	const uint esize = mesh.getEdgeSize();
+	const uint fsize = mesh.getFaceSize();
+	const uint bsize = mesh.getBodySize();
+	const uint qsize = mesh.getQuadSize();
+
+	if(npart.size() < nsize) return;
+	if(epart.size() < esize) return;
+	if(fpart.size() < fsize) return;
+	if(bpart.size() < bsize) return;
+	if(qpart.size() < qsize) return;
+
+	Buffer<uint> nlink(nsize);
+	Buffer<uint> elink(esize);
+	Buffer<uint> flink(fsize);
+	Buffer<uint> blink(bsize);
+
+	Buffer<uint> n;
+	Buffer<uint> e;
+	Buffer<uint> f;
+	Buffer<uint> b;
+	Buffer<uint> q;
+
+	uint ns = 0;
+	uint es = 0;
+	uint fs = 0;
+	uint bs = 0;
+	uint qs = 0;
+
+	Buffer<uint> ni(nsize, NONE);
+	Buffer<uint> ei(esize, NONE);
+	Buffer<uint> fi(fsize, NONE);
+	Buffer<uint> bi(bsize, NONE);
+
+	// find local elements
+	Buffer<uint> locs(m_parts, 0);
+	for(i=0; i<nsize; i++) {
+		if(npart[i] == m_part) {
+			ni[i] = ns;
+			n.gather(i, ns);
+		}
+		else nlink[i] = locs[npart[i]]++;
+	}
+	locs.fill(0);
+	for(i=0; i<esize; i++) {
+		if(epart[i] == m_part) {
+			ei[i] = es;
+			e.gather(i, es);
+		}
+		else elink[i] = locs[epart[i]]++;
+	}
+	locs.fill(0);
+	for(i=0; i<fsize; i++) {
+		if(fpart[i] == m_part) {
+			fi[i] = fs;
+			f.gather(i, fs);
+		}
+		else flink[i] = locs[fpart[i]]++;
+	}
+	locs.fill(0);
+	for(i=0; i<bsize; i++) {
+		if(bpart[i] == m_part) {
+			bi[i] = bs;
+			b.gather(i, bs);
+		}
+		else blink[i] = locs[bpart[i]]++;
+	}
+	locs.clear();
+	for(i=0; i<qsize; i++) {
+		if(qpart[i] == m_part) q.gather(i, qs);
+	}
+
+	// numbers of local elements
+	const uint n0 = ns;
+	const uint e0 = es;
+	const uint f0 = fs;
+	const uint b0 = bs;
+
+	// external elements
+	for(i=0; i<qs; i++) {
+		const Buffer<uint> &ele = mesh.getQuadBodies(q[i]);
+		for(j=0; j<ele.size(); j++) {
+			if(bi[ele[j]] != NONE) continue;
+			bi[ele[j]] = bs;
+			b.gather(ele[j], bs);
+		}
+	}
+	for(i=0; i<bs; i++) {
+		const Buffer<uint> &ele = mesh.getBodyFaces(b[i]);
+		for(j=0; j<ele.size(); j++) {
+			if(fi[ele[j]] != NONE) continue;
+			fi[ele[j]] = fs;
+			f.gather(ele[j], fs);
+		}
+	}
+	for(i=0; i<fs; i++) {
+		const Buffer<uint> &ele = mesh.getFaceEdges(f[i]);
+		for(j=0; j<ele.size(); j++) {
+			if(ei[ele[j]] != NONE) continue;
+			ei[ele[j]] = es;
+			e.gather(ele[j], es);
+		}
+	}
+	for(i=0; i<es; i++) {
+		const Buffer<uint> &ele = mesh.getEdgeNodes(e[i]);
+		for(j=0; j<ele.size(); j++) {
+			if(ni[ele[j]] != NONE) continue;
+			ni[ele[j]] = ns;
+			n.gather(ele[j], ns);
+		}
+	}
+
+	// create mesh
+	setMetric(mesh.getMetric());
+	resizeNodeBuffer(ns);
+	m_extn.resize(ns - n0);
+	for(i=0; i<ns; i++) {
+		addNode(mesh.getNodePosition(n[i]));
+		setNodeWeight(i, mesh.getNodeWeight(n[i]));
+		setNodeFlag(i, mesh.getNodeFlag(n[i]));
+		if(i >= n0) m_extn[i - n0] = pair<uint,uint>(npart[n[i]], nlink[n[i]]);
+	}
+	nlink.clear();
+	n.clear();
+	resizeEdgeBuffer(es);
+	m_exte.resize(es - e0);
+	for(i=0; i<es; i++) {
+		const Buffer<uint> &ele = mesh.getEdgeNodes(e[i]);
+		addEdge(ni[ele[0]], ni[ele[1]]);
+		setEdgeFlag(i, mesh.getEdgeFlag(e[i]));
+		if(i >= e0) m_exte[i - e0] = pair<uint,uint>(epart[e[i]], elink[e[i]]);
+	}
+	ni.clear();
+	elink.clear();
+	e.clear();
+	resizeFaceBuffer(fs);
+	m_extf.resize(fs - f0);
+	for(i=0; i<fs; i++) {
+		Buffer<uint> ele = mesh.getFaceEdges(f[i]);
+		for(j=0; j<ele.size(); j++) ele[j] = ei[ele[j]];
+		addFace(ele);
+		setFaceFlag(i, mesh.getFaceFlag(f[i]));
+		if(i >= f0) m_extf[i - f0] = pair<uint,uint>(fpart[f[i]], flink[f[i]]);
+	}
+	ei.clear();
+	flink.clear();
+	f.clear();
+	resizeBodyBuffer(bs);
+	m_extb.resize(bs - b0);
+	for(i=0; i<bs; i++) {
+		Buffer<uint> ele = mesh.getBodyFaces(b[i]);
+		for(j=0; j<ele.size(); j++) ele[j] = fi[ele[j]];
+		addBody(ele);
+		setBodyFlag(i, mesh.getBodyFlag(b[i]));
+		if(i >= b0) m_extb[i - b0] = pair<uint,uint>(bpart[b[i]], blink[b[i]]);
+	}
+	fi.clear();
+	blink.clear();
+	b.clear();
+	resizeQuadBuffer(qs);
+	for(i=0; i<qs; i++) {
+		Buffer<uint> ele = mesh.getQuadBodies(q[i]);
+		for(j=0; j<ele.size(); j++) ele[j] = bi[ele[j]];
+		addQuad(ele);
+		setQuadFlag(i, mesh.getQuadFlag(q[i]));
+	}
+}
+
 void PartMesh::createCombined(Buffer<const PartMesh *> &mesh)
 {
 	uint i, j, k, exts;
@@ -334,9 +508,7 @@ bool PartMesh::loadJRMesh(const std::string &path)
 	if(m_parts == 1) return Mesh::loadJRMesh(path); // full load
 
 	// load part
-	Text s;
-	s << path << "." << m_part;
-	std::ifstream fs(s.str().c_str(), std::ios::binary | std::ios::in);
+	std::ifstream fs(path.c_str(), std::ios::binary | std::ios::in);
 	if(fs.fail()) return false;
 
 	// header
@@ -485,9 +657,7 @@ bool PartMesh::saveJRMesh(const std::string &path) const
 	if(m_parts == 1) return Mesh::saveJRMesh(path); // save full
 
 	// save part
-	Text s;
-	s << path << "." << m_part;
-	std::ofstream fs(s.str().c_str(), std::ios_base::binary | std::ios::trunc);
+	std::ofstream fs(path.c_str(), std::ios_base::binary | std::ios::trunc);
 	if(fs.fail()) return false;
 
 	// header
