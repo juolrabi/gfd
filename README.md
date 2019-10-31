@@ -12,5 +12,5 @@ Author of this project is Jukka Räbinä, who currently works in the
 - Faculty of Information Technology at the University of Jyväskylä.
 
 The project is partially funded by
-- Academy of Finland Grants No. 259925 and 260076,
+- Academy of Finland Grants No. 259925, 260076, and 295897,
 - ERC Advanced Grant No. 320773.
