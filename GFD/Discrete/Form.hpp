@@ -30,6 +30,6 @@ template <typename T> using Hodge = Diagonal<T>;
 using Derivative = Sparse<sign>;
 
 
-};
+}
 
 #endif //_DEC_HPP_INCLUDED_

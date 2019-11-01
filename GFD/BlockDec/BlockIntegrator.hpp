@@ -78,6 +78,6 @@ protected:
 
 };
 
-};
+}
 
 #endif //_BLOCKINTEGRATOR_HPP_INCLUDED_

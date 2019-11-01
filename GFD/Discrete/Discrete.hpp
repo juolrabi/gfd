@@ -346,6 +346,6 @@ protected:
 
 };
 
-};
+}
 
 #endif //_DISCRETE_HPP_INCLUDED_

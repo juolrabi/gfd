@@ -435,6 +435,6 @@ protected:
 
 };
 
-};
+}
 
 #endif //_BLOCKMESH_HPP_INCLUDED_

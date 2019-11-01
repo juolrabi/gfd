@@ -48,6 +48,6 @@ protected:
 
 };
 
-};
+}
 
 #endif //_BLOCKINTERPOLATOR_HPP_INCLUDED_

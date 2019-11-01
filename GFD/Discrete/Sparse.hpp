@@ -1412,6 +1412,6 @@ template<typename R> Sparse<R> operator-(const Sparse<R> &r) {
 }
 
 
-};
+}
 
 #endif //_SPARSE_HPP_INCLUDED_

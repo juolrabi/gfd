@@ -104,6 +104,6 @@ template<typename R> Diagonal<R> operator-(const Diagonal<R> &r) {
 	return o.setNegation(r);
 }
 
-};
+}
 
 #endif //_DIAGONAL_HPP_INCLUDED_

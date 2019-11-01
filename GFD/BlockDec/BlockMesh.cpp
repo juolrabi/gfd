@@ -451,7 +451,7 @@ void BlockMesh::insertNodes(BuilderMesh &mesh, const uint type, const Vector4 &p
 			}
 		}
 	}
-/*	else if(type <= 127) // x-y-plane grid
+*//*	else if(type <= 127) // x-y-plane grid
 	{
 		const uint typei = 2;
 		const uint typex = (type - 100) % 3;

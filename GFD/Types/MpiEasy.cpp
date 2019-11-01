@@ -135,4 +135,4 @@ void barrierMPI()
 	MPI_Barrier(MPI_COMM_WORLD);
 }
 
-};
+}

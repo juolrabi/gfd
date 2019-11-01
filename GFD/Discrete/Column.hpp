@@ -175,6 +175,6 @@ template<typename R> Column<R> operator-(const Column<R> &r) {
 	return o.setNegation(r);
 }
 
-};
+}
 
 #endif //_COLUMN_HPP_INCLUDED_

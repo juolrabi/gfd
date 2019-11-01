@@ -178,6 +178,6 @@ public:
 	Buffer< Sparse<T> > m_term;
 };
 
-};
+}
 
 #endif //_SPLIT_HPP_INCLUDED_
