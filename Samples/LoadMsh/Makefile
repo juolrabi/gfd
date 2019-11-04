@@ -30,5 +30,5 @@ $(BUILD)/%.o: $(LIB)/%.cpp
 clean:
 	$(RMDIR_R) $(BUILD)
 run: $(BUILD)/$(TARGET)
-	cd $(BUILD); ./$(TARGET) ../test.msh test.jrm; cd ../
+	cd $(BUILD); ./$(TARGET) ../test.msh test.jrm pic.svg stat.txt; cd ../
 

@@ -140,21 +140,26 @@ int main(int argc, const char* argv[]) {
 
 	mesh.saveJRMesh(argv[2]);
 
-	Text stat;
-	mesh.writeStatistics(stat);
-	stat.save("stat.txt");
+	if(argc > 3) {
+		// draw the mesh
+		MeshDrawer drawer;
+		const Vector3 vo(0,0,0);
+		const Vector3 vp(-3,5,10);
+		const Vector3 vx = TwoVector3(Vector3(0,1,0), vp-vo).dual().unit() / 1.0;
+		const Vector3 vy = TwoVector3(vp-vo, vx).dual().unit() / 1.0;
+		drawer.initPosition(Vector4(vp,0), Vector4(vo,0), Vector4(vx,0), Vector4(vy,0));
+		drawer.initSvg(500, 500);
+		//drawer.drawPrimalEdges(mesh, Vector3(1,0,0));
+		drawer.drawBoundaryFaces(mesh, Vector3(1,0.5,0.5));
+		drawer.saveSvg(argv[3]);
+	}
 
-	// draw the mesh
-	MeshDrawer drawer;
-	const Vector3 vo(0,0,0);
-	const Vector3 vp(0,0,10);
-	const Vector3 vx = TwoVector3(Vector3(0,1,0), vp-vo).dual().unit() / 1.0;
-	const Vector3 vy = TwoVector3(vp-vo, vx).dual().unit() / 1.0;
-	drawer.initPosition(Vector4(vp,0), Vector4(vo,0), Vector4(vx,0), Vector4(vy,0));
-	drawer.initSvg(500, 500);
-	drawer.drawPrimalEdges(mesh, Vector3(1,0,0));
-	drawer.saveSvg("photo.svg");
-
+	if(argc > 4) {
+		// save statistics
+		Text stat;
+		mesh.writeStatistics(stat);
+		stat.save(argv[4]);
+	}
 	return 0;
 }
 
