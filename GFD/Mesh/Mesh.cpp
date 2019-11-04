@@ -2906,7 +2906,7 @@ void Mesh::resizeNodeBuffer(const uint size)
 {
 	if(size == m_n.size()) return;
 	m_p.resize(m_dim * size);
-	const uint minsize = size < m_n.size() ? size : m_n.size();
+	const uint minsize = (size < m_n.size() ? size : m_n.size());
 	if(minsize == 0)
 	{
 		m_n.resize(size);

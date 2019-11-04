@@ -23,13 +23,15 @@ bool Text::load(const std::string &path)
 	const uint size = fs.tellg();
 	fs.seekg(0, std::ios::beg);
 
-	// read the content of *this
-	char *buffer = new char[size];
-	fs.read(buffer, size);
+	if(size > 0) {
+		// read the content of *this
+		char *buffer = new char[size];
+		fs.read(buffer, size);
 
-	// write the content to the file stream
-	write(buffer, size);
-	delete[] buffer;
+		// write the content to the file stream
+		write(buffer, size);
+		delete[] buffer;
+	}
 
 	// close the file and exit
 	fs.close();
@@ -46,13 +48,15 @@ bool Text::save(const std::string &path)
 	const uint size = tellg();
 	seekg(0, std::ios::beg);
 
-	// read the content of *this
-	char *buffer = new char[size];
-	read(buffer, size);
+	if(size > 0) {
+		// read the content of *this
+		char *buffer = new char[size];
+		read(buffer, size);
 
-	// write the content to the file stream
-	fs.write(buffer, size);
-	delete[] buffer;
+		// write the content to the file stream
+		fs.write(buffer, size);
+		delete[] buffer;
+	}
 
 	// close the file and exit
 	fs.close();
