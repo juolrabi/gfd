@@ -7,361 +7,427 @@
 #include "../../GFD/Mesh/PartMesh.hpp"
 #include "../../GFD/Mesh/BuilderMesh.hpp"
 #include "../../GFD/Types/Types.hpp"
+#include "../../GFD/Output/MeshDrawer.hpp"
 #include <fstream>
 #include <iostream>
 #include <map>
 
+using namespace std;
 using namespace gfd;
 
-bool divide(const uint divide, double (*func)(const Vector4 &), const Mesh &mesh, Buffer<uint> &npart, uint &parts) {
+uint minimum(const Buffer<uint> &part, const Buffer<uint> &ele) {
+	uint res = NONE;
+	for(uint i=0; i<ele.size(); i++) {
+		if(res > part[ele[i]]) res = part[ele[i]];
+	}
+	return res;
+}
+
+void splitElements(const uint newparts, const Mesh &mesh, const Buffer<uint> &npart, Buffer<uint> &epart, Buffer<uint> &fpart, Buffer<uint> &bpart, Buffer<uint> &qpart, uint &parts) {
+	uint i;
+	for(i=0; i<epart.size(); i++) {
+		if(epart[i] < parts)  epart[i] = minimum(npart, mesh.getEdgeNodes(i));
+		else if(epart[i] != NONE) epart[i] += newparts - parts;
+	}
+	for(i=0; i<fpart.size(); i++) {
+		if(fpart[i] < parts)  fpart[i] = minimum(epart, mesh.getFaceEdges(i));
+		else if(fpart[i] != NONE) fpart[i] += newparts - parts;
+	}
+	for(i=0; i<bpart.size(); i++) {
+		if(bpart[i] < parts)  bpart[i] = minimum(fpart, mesh.getBodyFaces(i));
+		else if(bpart[i] != NONE) bpart[i] += newparts - parts;
+	}
+	for(i=0; i<qpart.size(); i++) {
+		if(qpart[i] < parts)  qpart[i] = minimum(bpart, mesh.getQuadBodies(i));
+		else if(qpart[i] != NONE) qpart[i] += newparts - parts;
+	}
+	parts = newparts;
+}
+
+bool split(const uint divide, double (*func)(const Vector4 &), const Mesh &mesh, Buffer<uint> &npart, Buffer<uint> &epart, Buffer<uint> &fpart, Buffer<uint> &bpart, Buffer<uint> &qpart, uint &parts) {
 	if(divide == 0) return false;
 	if(divide == 1) return true;
 
-	multimap<double,uint> tree;
-	const uint nodes = mesh.getNodeSize();
-	for(uint i=0; i<nodes; i++) tree.insert(pair<double,uint>(func(mesh.getNodePosition(i)), i));
-
-	auto it = tree.begin();
-	for(uint i=0; i<nodes; i++, it++) npart[it->second] += parts * uint(i * divide / nodes);
-	parts *= divide;
+	// order nodes by func
+	uint i, j;
+	const uint newparts = parts * divide;
+	Buffer< multimap<double,uint> > tree(parts);
+	for(i=0; i<npart.size(); i++) {
+		if(npart[i] < parts) tree[npart[i]].insert(pair<double,uint>(func(mesh.getNodePosition(i)), i));
+		else if(npart[i] != NONE) npart[i] += newparts - parts;
+	}
+	for(i=0; i<parts; i++) {
+		const uint treesize = uint(tree[i].size());
+		auto it = tree[i].begin();
+		for(j=0; j<treesize; j++,it++) {
+			npart[it->second] = divide * npart[it->second] + uint(j * divide / treesize);
+		}
+	}
+	splitElements(newparts, mesh, npart, epart, fpart, bpart, qpart, parts);
 	return true;
 }
 
-double lensq(const Vector4 &p) {
-	return p.lensq();
+bool flagSplit(const Mesh &mesh, Buffer<uint> &npart, Buffer<uint> &epart, Buffer<uint> &fpart, Buffer<uint> &bpart, Buffer<uint> &qpart, uint &parts) {
+	// order nodes by func
+	uint i;
+	Buffer<uint> flags(parts, 0);
+	Buffer< Buffer<uint> > flag(parts);
+	for(i=0; i<npart.size(); i++) {
+		if(npart[i] < parts) flag[npart[i]].gatherOnce(mesh.getNodeFlag(i), flags[npart[i]]);
+	}
+	Buffer<uint> part0(parts, 0);
+	for(i=1; i<parts; i++) part0[i] = part0[i-1] + flags[i-1];
+	const uint newparts = part0.back() + flags.back();
+
+	for(i=0; i<npart.size(); i++) {
+		if(npart[i] < parts) npart[i] = part0[npart[i]] + flag[npart[i]].findFirst(mesh.getNodeFlag(i));
+		else if(npart[i] != NONE) npart[i] += newparts - parts;
+	}
+	splitElements(newparts, mesh, npart, epart, fpart, bpart, qpart, parts);
+	return true;
 }
 
-double polarxy(const Vector4 &p) {
-	if(p.x * p.x + p.y * p.y < 1e-13) return 0;
+void chain(Buffer<uint> &part, const uint parts) {
+	for(uint i=0; i<part.size(); i++) {
+		if(part[i] == NONE || part[i] < parts) continue;
+		const uint parti = part[part[i] - parts];
+		if(parti == NONE || parti < parts) continue;
+		part[i] = parti;
+	}
+}
+
+bool repeat(const double v0, const double v1, double (*func)(const Vector4 &), Vector4 (*_func)(const Vector4 &, const double), const Mesh &mesh, Buffer<uint> &npart, Buffer<uint> &epart, Buffer<uint> &fpart, Buffer<uint> &bpart, Buffer<uint> &qpart, const uint parts) {
+	if(v0 >= v1) {
+		cout << "Repeat failed: Second parameter should be larger than the first." << endl;
+		return false;
+	}
+	if(parts != 1) cout << "Please apply repeat before split-commands." << endl;
+	
+	uint i, j;
+	const double vM = 2.0 * v0 - v1 - 1e-8;
+	Buffer<uchar> nslot(npart.size(), 0);
+	for(i=0; i<npart.size(); i++) {
+		if(npart[i] == NONE) continue;
+		const Vector4 p = mesh.getNodePosition(i);
+		const double v = func(p);
+		if(v > v1 || v < vM) npart[i] = NONE;
+		else if(v <= v0) npart[i] = parts + i;
+	}
+	for(i=0; i<epart.size(); i++) {
+		if(epart[i] == NONE) continue;
+		uint sum = 0;
+		const Buffer<uint> &ele = mesh.getEdgeNodes(i);
+		for(j=0; j<ele.size(); j++) {
+			const uint jpart = npart[ele[j]];
+			if(jpart == NONE) {
+				epart[i] = NONE; 
+				break;
+			}
+			else if(jpart == parts + ele[j]) sum++;
+		}
+		if(sum == j) epart[i] = parts + i;
+	}
+	for(i=0; i<fpart.size(); i++) {
+		if(fpart[i] == NONE) continue;
+		uint sum = 0;
+		const Buffer<uint> &ele = mesh.getFaceEdges(i);
+		for(j=0; j<ele.size(); j++) {
+			const uint jpart = epart[ele[j]];
+			if(jpart == NONE) {
+				fpart[i] = NONE; 
+				break;
+			}
+			else if(jpart == parts + ele[j]) sum++;
+		}
+		if(sum == j) fpart[i] = parts + i;
+	}
+	for(i=0; i<bpart.size(); i++) {
+		if(bpart[i] == NONE) continue;
+		uint sum = 0;
+		const Buffer<uint> &ele = mesh.getBodyFaces(i);
+		for(j=0; j<ele.size(); j++) {
+			const uint jpart = fpart[ele[j]];
+			if(jpart == NONE) {
+				bpart[i] = NONE; 
+				break;
+			}
+			else if(jpart == parts + ele[j]) sum++;
+		}
+		if(sum == j) bpart[i] = parts + i;
+	}
+	for(i=0; i<qpart.size(); i++) {
+		if(qpart[i] == NONE) continue;
+		uint sum = 0;
+		const Buffer<uint> &ele = mesh.getQuadBodies(i);
+		for(j=0; j<ele.size(); j++) {
+			const uint jpart = bpart[ele[j]];
+			if(jpart == NONE) {
+				qpart[i] = NONE; 
+				break;
+			}
+			else if(jpart == parts + ele[j]) sum++;
+		}
+		if(sum == j) qpart[i] = parts + i;
+	}
+
+	// ignore unnecessary elements (set part = NONE, where possible)
+	for(i=0; i<qpart.size(); i++) {
+		if(qpart[i] != parts + i) continue;
+		qpart[i] = NONE;
+	}
+	for(i=0; i<bpart.size(); i++) {
+		if(bpart[i] != parts + i) continue;
+		const Buffer<uint> &ele = mesh.getBodyQuads(i);
+		for(j=0; j<ele.size(); j++) {
+			if(qpart[ele[j]] != NONE) break;
+		}
+		if(j == ele.size()) bpart[i] = NONE;
+	}
+	for(i=0; i<fpart.size(); i++) {
+		if(fpart[i] != parts + i) continue;
+		const Buffer<uint> &ele = mesh.getFaceBodies(i);
+		for(j=0; j<ele.size(); j++) {
+			if(bpart[ele[j]] != NONE) break;
+		}
+		if(j == ele.size()) fpart[i] = NONE;
+	}
+	for(i=0; i<epart.size(); i++) {
+		if(epart[i] != parts + i) continue;
+		const Buffer<uint> &ele = mesh.getEdgeFaces(i);
+		for(j=0; j<ele.size(); j++) {
+			if(fpart[ele[j]] != NONE) break;
+		}
+		if(j == ele.size()) epart[i] = NONE;
+	}
+	for(i=0; i<npart.size(); i++) {
+		if(npart[i] != parts + i) continue;
+		const Buffer<uint> &ele = mesh.getNodeEdges(i);
+		for(j=0; j<ele.size(); j++) {
+			if(epart[ele[j]] != NONE) break;
+		}
+		if(j == ele.size()) npart[i] = NONE;
+	}
+
+	// find repeating matched elements
+	for(i=0; i<npart.size(); i++) {
+		if(npart[i] != parts + i) continue;
+		const Vector4 p = _func(mesh.getNodePosition(i), v1 - v0);
+		const uint match = mesh.findNode(p, 1e-8, i, true);
+		if(match == NONE) cout << "Repeat failed: Can not find matched node." << endl;
+		else npart[i] = parts + match;
+	}
+	for(i=0; i<epart.size(); i++) {
+		if(epart[i] != parts + i) continue;
+		Buffer<uint> ele = mesh.getEdgeNodes(i);
+		for(j=0; j<ele.size(); j++) ele[j] = npart[ele[j]]-parts;
+		const uint match = mesh.findEdge(ele[0], ele[1]);
+		if(match == NONE) cout << "Repeat failed: Can not find matched edge." << endl;
+		else epart[i] = parts + match;
+	}
+	for(i=0; i<fpart.size(); i++) {
+		if(fpart[i] != parts + i) continue;
+		Buffer<uint> ele = mesh.getFaceEdges(i);
+		for(j=0; j<ele.size(); j++) ele[j] = epart[ele[j]]-parts;
+		const uint match = mesh.findFace(ele);
+		if(match == NONE) cout << "Repeat failed: Can not find matched face." << endl;
+		else fpart[i] = parts + match;
+	}
+	for(i=0; i<bpart.size(); i++) {
+		if(bpart[i] != parts + i) continue;
+		Buffer<uint> ele = mesh.getBodyFaces(i);
+		for(j=0; j<ele.size(); j++) ele[j] = fpart[ele[j]]-parts;
+		const uint match = mesh.findBody(ele);
+		if(match == NONE) cout << "Repeat failed: Can not find matched body." << endl;
+		else bpart[i] = parts + match;
+	}
+
+	// chain links
+	chain(npart, parts);
+	chain(epart, parts);
+	chain(fpart, parts);
+	chain(bpart, parts);
+	return true;
+}
+
+double valuex(const Vector4 &p) { return p.x; }
+Vector4 _valuex(const Vector4 &p, const double d) { return p + Vector4(d,0,0,0); }
+double valuey(const Vector4 &p) { return p.y; }
+Vector4 _valuey(const Vector4 &p, const double d) { return p + Vector4(0,d,0,0); }
+double valuez(const Vector4 &p) { return p.z; }
+Vector4 _valuez(const Vector4 &p, const double d) { return p + Vector4(0,0,d,0); }
+double valuet(const Vector4 &p) { return p.t; }
+Vector4 _valuet(const Vector4 &p, const double d) { return p + Vector4(0,0,0,d); }
+double radius(const Vector4 &p) { return p.len(); }
+Vector4 _radius(const Vector4 &p, const double d) { return p + d * p.unit(); }
+
+inline double polar(const Vector2 &p) {
 	if(p.y >= 0.0) {
-		if(p.x > p.y) return p.y / p.x; // 0..1
-		if(p.x > -p.y) return 2.0 - p.x / p.y; // 1..3
-		return 4.0 + p.y / p.x; // 3..4
+		if(p.x > p.y) return atan(p.y / p.x); // 0..1
+		if(p.x > -p.y) return 0.5 * PI - atan(p.x / p.y); // 1..3
+		return PI + atan(p.y / p.x); // 3..4
 	}
-	if(p.x < p.y) return 4.0 + p.y / p.x; // 4..5
-	if(p.x < -p.y) return 6.0 - p.x / p.y; // 5..7
-	return 8.0 + p.y / p.x; // 7..8
+	if(p.x < p.y) return -PI + atan(p.y / p.x); // -4..-3
+	if(p.x < -p.y) return -0.5 * PI - atan(p.x / p.y); // -3..-1
+	return atan(p.y / p.x); // -1..0
 }
-double polarxz(const Vector4 &p) {
-	if(p.x * p.x + p.z * p.z < 1e-13) return 0;
-	if(p.z >= 0.0) {
-		if(p.x > p.z) return p.z / p.x; // 0..1
-		if(p.x > -p.z) return 2.0 - p.x / p.z; // 1..3
-		return 4.0 + p.z / p.x; // 3..4
-	}
-	if(p.x < p.z) return 4.0 + p.z / p.x; // 4..5
-	if(p.x < -p.z) return 6.0 - p.x / p.z; // 5..7
-	return 8.0 + p.z / p.x; // 7..8
+inline Vector2 _polar(const Vector2 &p, const double d) {
+	const double cosi = cos(d);
+	const double sini = sin(d);
+	return Matrix2(cosi, -sini, sini, cosi) * p;
 }
-double polarxt(const Vector4 &p) {
-	if(p.x * p.x + p.t * p.t < 1e-13) return 0;
-	if(p.t >= 0.0) {
-		if(p.x > p.t) return p.t / p.x; // 0..1
-		if(p.x > -p.t) return 2.0 - p.x / p.t; // 1..3
-		return 4.0 + p.t / p.x; // 3..4
-	}
-	if(p.x < p.t) return 4.0 + p.t / p.x; // 4..5
-	if(p.x < -p.t) return 6.0 - p.x / p.t; // 5..7
-	return 8.0 + p.t / p.x; // 7..8
-}
-double polaryz(const Vector4 &p) {
-	if(p.y * p.y + p.z * p.z < 1e-13) return 0;
-	if(p.z >= 0.0) {
-		if(p.y > p.z) return p.z / p.y; // 0..1
-		if(p.y > -p.z) return 2.0 - p.y / p.z; // 1..3
-		return 4.0 + p.z / p.y; // 3..4
-	}
-	if(p.y < p.z) return 4.0 + p.z / p.y; // 4..5
-	if(p.y < -p.z) return 6.0 - p.y / p.z; // 5..7
-	return 8.0 + p.z / p.y; // 7..8
-}
-double polaryt(const Vector4 &p) {
-	if(p.y * p.y + p.t * p.t < 1e-13) return 0;
-	if(p.t >= 0.0) {
-		if(p.y > p.t) return p.t / p.y; // 0..1
-		if(p.y > -p.t) return 2.0 - p.y / p.t; // 1..3
-		return 4.0 + p.t / p.y; // 3..4
-	}
-	if(p.y < p.t) return 4.0 + p.t / p.y; // 4..5
-	if(p.y < -p.t) return 6.0 - p.y / p.t; // 5..7
-	return 8.0 + p.t / p.y; // 7..8
-}
-double polarzt(const Vector4 &p) {
-	if(p.z * p.z + p.t * p.t < 1e-13) return 0;
-	if(p.t >= 0.0) {
-		if(p.z > p.t) return p.t / p.z; // 0..1
-		if(p.z > -p.t) return 2.0 - p.z / p.t; // 1..3
-		return 4.0 + p.t / p.z; // 3..4
-	}
-	if(p.z < p.t) return 4.0 + p.t / p.z; // 4..5
-	if(p.z < -p.t) return 6.0 - p.z / p.t; // 5..7
-	return 8.0 + p.t / p.z; // 7..8
-}
+double polarxy(const Vector4 &p) { return polar(Vector2(p.x, p.y)); }
+Vector4 _polarxy(const Vector4 &p, const double d) { const Vector2 v = _polar(Vector2(p.x, p.y), d); return Vector4(v.x, v.y, p.z, p.t); }
+double polarxz(const Vector4 &p) { return polar(Vector2(p.x, p.z)); }
+Vector4 _polarxz(const Vector4 &p, const double d) { const Vector2 v = _polar(Vector2(p.x, p.z), d); return Vector4(v.x, p.y, v.y, p.t); }
+double polarxt(const Vector4 &p) { return polar(Vector2(p.x, p.t)); }
+Vector4 _polarxt(const Vector4 &p, const double d) { const Vector2 v = _polar(Vector2(p.x, p.t), d); return Vector4(v.x, p.y, p.z, v.y); }
+double polaryz(const Vector4 &p) { return polar(Vector2(p.y, p.z)); }
+Vector4 _polaryz(const Vector4 &p, const double d) { const Vector2 v = _polar(Vector2(p.y, p.z), d); return Vector4(p.x, v.x, v.y, p.t); }
+double polaryt(const Vector4 &p) { return polar(Vector2(p.y, p.t)); }
+Vector4 _polaryt(const Vector4 &p, const double d) { const Vector2 v = _polar(Vector2(p.y, p.t), d); return Vector4(p.x, v.x, p.z, v.y); }
+double polarzt(const Vector4 &p) { return polar(Vector2(p.z, p.t)); }
+Vector4 _polarzt(const Vector4 &p, const double d) { const Vector2 v = _polar(Vector2(p.z, p.t), d); return Vector4(p.x, p.y, v.x, v.y); }
 
-double azimuthx(const Vector4 &p) {
-	return p.x / sqrt(p.y * p.y + p.z * p.z + p.t * p.t);
+inline double azimuth(const double x, const Vector4 &p) { return asin(x / p.len()); }
+inline Vector4 _azimuth(const Vector4 &x, const Vector4 &p, const double d) { 
+	const double psq = p.lensq();
+	const Vector4 q = x.dot(p) * p + psq * x; 
+	return cos(d) * p + sin(d) * sqrt(psq / q.lensq()) * q;
 }
-double azimuthy(const Vector4 &p) {
-	return p.y / sqrt(p.x * p.x + p.z * p.z + p.t * p.t);
-}
-double azimuthz(const Vector4 &p) {
-	return p.z / sqrt(p.x * p.x + p.y * p.y + p.t * p.t);
-}
-double azimutht(const Vector4 &p) {
-	return p.t / sqrt(p.x * p.x + p.y * p.y + p.z * p.z);
-}
+double azimuthx(const Vector4 &p) { return azimuth(p.x, p); }
+Vector4 _azimuthx(const Vector4 &p, const double d) { return _azimuth(Vector4(1,0,0,0), p, d); }
+double azimuthy(const Vector4 &p) { return azimuth(p.y, p); }
+Vector4 _azimuthy(const Vector4 &p, const double d) { return _azimuth(Vector4(0,1,0,0), p, d); }
+double azimuthz(const Vector4 &p) { return azimuth(p.z, p); }
+Vector4 _azimuthz(const Vector4 &p, const double d) { return _azimuth(Vector4(0,0,1,0), p, d); }
+double azimutht(const Vector4 &p) { return azimuth(p.t, p); }
+Vector4 _azimutht(const Vector4 &p, const double d) { return _azimuth(Vector4(0,0,0,1), p, d); }
 
-double valuex(const Vector4 &p) {
-	return p.x;
-}
-double valuey(const Vector4 &p) {
-	return p.y;
-}
-double valuez(const Vector4 &p) {
-	return p.z;
-}
-double valuet(const Vector4 &p) {
-	return p.t;
-}
 
-uint getUint(const std::string &str, const uint def)
-{
-	char *rest;
-	const double val = strtod(str.c_str(), &rest);
-	if(rest == NULL) return def;
-	if(val < 0.0) return 0;
-	return uint(val + 0.5);
-}
-
-double getDouble(const std::string &str, const double def)
-{
+double getDouble(const string &str, const double def) {
 	char *rest;
 	const double val = strtod(str.c_str(), &rest);
 	if(rest == NULL) return def;
 	return val;
 }
+uint getUint(const string &str, const uint def) {
+	const double val = getDouble(str, double(def));
+	if(val < 0.0) return 0;
+	return uint(val + 0.5);
+}
 
+bool checkSplit(const string &line, const string &command, double (*func)(const Vector4 &), const Mesh &mesh, Buffer<uint> &npart, Buffer<uint> &epart, Buffer<uint> &fpart, Buffer<uint> &bpart, Buffer<uint> &qpart, uint &parts){
+	const uint commsize = command.size();
+	if(line.substr(0, commsize).compare(command) != 0) return false;
+	const uint v = getUint(line.substr(commsize), 2);
+	if(split(v, func, mesh, npart, epart, fpart, bpart, qpart, parts)) 
+		cout << "Command " << line << " succeeded." << endl;
+	else cout << "Command " << line << " failed!" << endl;
+	return true;
+}
+bool checkRepeat(const string &line, const string &command, double (*func)(const Vector4 &), Vector4 (*_func)(const Vector4 &, const double), const Mesh &mesh, Buffer<uint> &npart, Buffer<uint> &epart, Buffer<uint> &fpart, Buffer<uint> &bpart, Buffer<uint> &qpart, const uint parts) {
+	const uint commsize = command.size();
+	if(line.substr(0, commsize).compare(command) != 0) return false;
+	const size_t separ = line.find_first_of('_', commsize);
+	if(separ == string::npos) cout << "Please type " << command << "{min}_{max}." << endl;
+	const double v0 = getDouble(line.substr(commsize, separ), 0.0);
+	const double v1 = getDouble(line.substr(separ+1), 0.0);
+	if(repeat(v0, v1, func, _func, mesh, npart, epart, fpart, bpart, qpart, parts))
+		cout << "Command " << line << " succeeded." << endl;
+	else cout << "Command " << line << " failed!" << endl;
+	return true;
+}
 
 int main(int argc, const char* argv[])
 {
 	if(argc <= 2)
 	{
-		std::cout << "Please insert mesh file path as the first argument and at least one split argument." << std::endl;
+		cout << "Please insert mesh file path as the first argument and at least one split argument." << endl;
 		return 0;
 	}
 
 	// run by command arguments
 	// first load mesh
 	Mesh mesh;
-	if(mesh.loadJRMesh(argv[1])) std::cout << "Mesh loaded succesfully." << std::endl;
+	if(mesh.loadJRMesh(argv[1])) cout << "Mesh loaded succesfully." << endl;
 	else
 	{
-		std::cout << "Unable to load mesh " << argv[1] << std::endl;
-		std::cout << "We create a cubic mesh for testing purposes. Please try again." << std::endl;
+		cout << "Unable to load mesh " << argv[1] << endl;
+		cout << "We create a cubic mesh for testing purposes. Please try again." << endl;
 		BuilderMesh bmesh(3);
-		bmesh.createGrid(Vector4(-1,-1,-1,0), Vector4(1,1,1,0), 0.1);
+		bmesh.createGrid(Vector4(-0.3,-0.3,0,0), Vector4(0.3,0.3,0,0), 0.1);
 		bmesh.saveJRMesh(argv[1]);
 		return 0;
 	}
 
+	uint i;
 	uint parts = 1;
 	Buffer<uint> npart(mesh.getNodeSize(), 0);
-
-	uint i, j;
-	//Vector3 pmin(-1e30, -1e30, -1e30);
-	//Vector3 pmax(1e30, 1e30, 1e30);
-	for(int ai=2; ai<argc; ai++) {
-		std::string line = argv[ai];
-		if(line.substr(0, 4).compare("flag") == 0) {
-			uint iparts = 1;
-			for(i=0; i<npart.size(); i++) {
-				const uint flag = mesh.getNodeFlag(i);
-				if(iparts <= flag) iparts = flag + 1; 
-				npart[i] += parts * flag;
-				mesh.setNodeFlag(i, 0);
-			}
-			parts = iparts;
-			std::cout << "Division by node flags." << std::endl;
-		}
-		else if(line.substr(0, 2).compare("x_") == 0) {
-			const uint val = getUint(line.substr(2), 2);
-			if(divide(val, valuex, mesh, npart, parts)) std::cout << "X-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "X-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 2).compare("y_") == 0) {
-			const uint val = getUint(line.substr(2), 2);
-			if(divide(val, valuey, mesh, npart, parts)) std::cout << "Y-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Y-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 2).compare("z_") == 0) {
-			const uint val = getUint(line.substr(2), 2);
-			if(divide(val, valuez, mesh, npart, parts)) std::cout << "Z-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Z-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 2).compare("t_") == 0) {
-			const uint val = getUint(line.substr(2), 2);
-			if(divide(val, valuet, mesh, npart, parts)) std::cout << "T-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "T-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 9).compare("azimuthx_") == 0) {
-			const uint val = getUint(line.substr(9), 2);
-			if(divide(val, azimuthx, mesh, npart, parts)) std::cout << "Azimuth X-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Azimuth X-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 9).compare("azimuthy_") == 0) {
-			const uint val = getUint(line.substr(9), 2);
-			if(divide(val, azimuthy, mesh, npart, parts)) std::cout << "Azimuth Y-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Azimuth Y-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 9).compare("azimuthz_") == 0) {
-			const uint val = getUint(line.substr(9), 2);
-			if(divide(val, azimuthz, mesh, npart, parts)) std::cout << "Azimuth Z-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Azimuth Z-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 9).compare("azimutht_") == 0) {
-			const uint val = getUint(line.substr(9), 2);
-			if(divide(val, azimutht, mesh, npart, parts)) std::cout << "Azimuth T-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Azimuth T-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 8).compare("polarxy_") == 0) {
-			const uint val = getUint(line.substr(8), 2);
-			if(divide(val, polarxy, mesh, npart, parts)) std::cout << "Polar XY-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Polar XY-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 8).compare("polarxz_") == 0) {
-			const uint val = getUint(line.substr(8), 2);
-			if(divide(val, polarxz, mesh, npart, parts)) std::cout << "Polar XZ-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Polar XZ-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 8).compare("polarxt_") == 0) {
-			const uint val = getUint(line.substr(8), 2);
-			if(divide(val, polarxt, mesh, npart, parts)) std::cout << "Polar XT-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Polar XT-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 8).compare("polaryz_") == 0) {
-			const uint val = getUint(line.substr(8), 2);
-			if(divide(val, polaryz, mesh, npart, parts)) std::cout << "Polar YZ-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Polar YZ-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 8).compare("polaryt_") == 0) {
-			const uint val = getUint(line.substr(8), 2);
-			if(divide(val, polaryt, mesh, npart, parts)) std::cout << "Polar YT-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Polar YT-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 8).compare("polarzt_") == 0) {
-			const uint val = getUint(line.substr(8), 2);
-			if(divide(val, polarzt, mesh, npart, parts)) std::cout << "Polar ZT-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Polar ZT-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 7).compare("radius_") == 0) {
-			const uint val = getUint(line.substr(7), 2);
-			if(divide(val, lensq, mesh, npart, parts)) std::cout << "Radius-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Radius-split failed!" << std::endl;
-		}
-
-/*		else if(line.substr(0, 6).compare("polarx") == 0)
-		{
-			const uint val = getUint(line.substr(6), 2);
-			if(mesh.divide(val, polarx)) std::cout << "Polar X-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Polar X-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 6).compare("polary") == 0)
-		{
-			const uint val = getUint(line.substr(6), 2);
-			if(mesh.divide(val, polary)) std::cout << "Polar Y-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Polar Y-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 6).compare("polarz") == 0)
-		{
-			const uint val = getUint(line.substr(6), 2);
-			if(mesh.divide(val, polarz)) std::cout << "Polar Z-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Polar Z-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 8).compare("azimuthx") == 0)
-		{
-			const uint val = getUint(line.substr(8), 2);
-			if(mesh.divide(val, polarx)) std::cout << "Azimuth X-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Azimuth X-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 8).compare("azimuthy") == 0)
-		{
-			const uint val = getUint(line.substr(8), 2);
-			if(mesh.divide(val, polary)) std::cout << "Azimuth Y-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Azimuth Y-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 8).compare("azimuthz") == 0)
-		{
-			const uint val = getUint(line.substr(8), 2);
-			if(mesh.divide(val, polarz)) std::cout << "Azimuth Z-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Azimuth Z-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 4).compare("minx") == 0)
-		{
-			pmin.x = getDouble(line.substr(4), 0.0);
-		}
-		else if(line.substr(0, 4).compare("maxx") == 0)
-		{
-			pmax.x = getDouble(line.substr(4), 0.0);
-		}
-		else if(line.substr(0, 4).compare("miny") == 0)
-		{
-			pmin.y = getDouble(line.substr(4), 0.0);
-		}
-		else if(line.substr(0, 4).compare("maxy") == 0)
-		{
-			pmax.y = getDouble(line.substr(4), 0.0);
-		}
-		else if(line.substr(0, 4).compare("minz") == 0)
-		{
-			pmin.z = getDouble(line.substr(4), 0.0);
-		}
-		else if(line.substr(0, 4).compare("maxz") == 0)
-		{
-			pmax.z = getDouble(line.substr(4), 0.0);
-		}
-		else if(line.substr(0, 6).compare("repeat") == 0)
-		{
-			if(mesh.restrictArea(pmin, pmax)) std::cout << "Repeat area set between (" << pmin.x << ", " << pmin.y << ", " << pmin.z << ") and (" << pmax.x << ", " << pmax.y << ", " << pmax.z << ")." << std::endl;
-			else std::cout << "Failed to set repeat area!" << std::endl;
-		}
-*/	}
-
-	// parts must be greater that 1 for a split to occur
-	if(parts == 1) {
-		cout << "No split occurred." << endl;
-		return 0;
-	}
-
-
-	// compute higher element parts from node parts
 	Buffer<uint> epart(mesh.getEdgeSize(), 0);
-	for(i=0; i<epart.size(); i++) { 
-		const Buffer<uint> &ele = mesh.getEdgeNodes(i);
-		for(j=0; j<ele.size(); j++) {
-			if(epart[i] < npart[ele[j]]) epart[i] = npart[ele[j]];
-		}
-	}
 	Buffer<uint> fpart(mesh.getFaceSize(), 0);
-	for(i=0; i<fpart.size(); i++) { 
-		const Buffer<uint> &ele = mesh.getFaceEdges(i);
-		for(j=0; j<ele.size(); j++) {
-			if(fpart[i] < epart[ele[j]]) fpart[i] = epart[ele[j]];
-		}
-	}
 	Buffer<uint> bpart(mesh.getBodySize(), 0);
-	for(i=0; i<bpart.size(); i++) { 
-		const Buffer<uint> &ele = mesh.getBodyFaces(i);
-		for(j=0; j<ele.size(); j++) {
-			if(bpart[i] < fpart[ele[j]]) bpart[i] = fpart[ele[j]];
-		}
-	}
 	Buffer<uint> qpart(mesh.getQuadSize(), 0);
-	for(i=0; i<qpart.size(); i++) { 
-		const Buffer<uint> &ele = mesh.getQuadBodies(i);
-		for(j=0; j<ele.size(); j++) {
-			if(qpart[i] < bpart[ele[j]]) qpart[i] = bpart[ele[j]];
+
+	for(int ai=2; ai<argc; ai++) {
+		string line = argv[ai];
+		
+		if(line.substr(0, 4).compare("flagsplit") == 0) {
+			if(flagSplit(mesh, npart, epart, fpart, bpart, qpart, parts)) 
+				cout << "Command " << line << " succeeded." << endl;
+			else cout << "Command " << line << " failed!" << endl;
+			continue;
 		}
+
+		if(checkSplit(line, "splitx_", valuex, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "splity_", valuey, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "splitz_", valuez, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "splitt_", valuet, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "splitr_", radius, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "repeatpolarxy_", polarxy, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "repeatpolarxz_", polarxz, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "repeatpolarxt_", polarxt, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "repeatpolaryz_", polaryz, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "repeatpolaryt_", polaryt, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "repeatpolarzt_", polarzt, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "repeatazimuthx_", azimuthx, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "repeatazimuthy_", azimuthy, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "repeatazimuthz_", azimuthz, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "repeatazimutht_", azimutht, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+
+		if(checkRepeat(line, "repeatx_", valuex, _valuex, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkRepeat(line, "repeaty_", valuey, _valuey, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkRepeat(line, "repeatz_", valuez, _valuez, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkRepeat(line, "repeatt_", valuet, _valuet, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkRepeat(line, "repeatr_", radius, _radius, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkRepeat(line, "repeatpolarxy_", polarxy, _polarxy, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkRepeat(line, "repeatpolarxz_", polarxz, _polarxz, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkRepeat(line, "repeatpolarxt_", polarxt, _polarxt, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkRepeat(line, "repeatpolaryz_", polaryz, _polaryz, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkRepeat(line, "repeatpolaryt_", polaryt, _polaryt, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkRepeat(line, "repeatpolarzt_", polarzt, _polarzt, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkRepeat(line, "repeatazimuthx_", azimuthx, _azimuthx, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkRepeat(line, "repeatazimuthy_", azimuthy, _azimuthy, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkRepeat(line, "repeatazimuthz_", azimuthz, _azimuthz, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkRepeat(line, "repeatazimutht_", azimutht, _azimutht, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		cout << "Unknown argument: " << line << "." << endl;
 	}
+
+	for(i=0; i<npart.size(); i++) {
+		if(i % 7 == 0) cout << endl;
+		cout << npart[i] << " ";
+		
+	} 
+	cout << endl << endl;
+	for(i=0; i<epart.size(); i++) {
+		if(i % 7 == 0) cout << endl;
+		cout << epart[i] << " ";
+	} 
+	cout << endl << endl;
+	for(i=0; i<fpart.size(); i++) {
+		if(i % 6 == 0) cout << endl;
+		cout << fpart[i] << " ";
+	} 
+	cout << endl << endl;
 
 	// save part meshes
 	for(i=0; i<parts; i++) {
@@ -371,6 +437,21 @@ int main(int argc, const char* argv[])
 		path << argv[1] << "." << i;
 		if(pmesh.saveJRMesh(path.str())) cout << "Saved part mesh " << path.str() << "." << endl;
 		else cout << "Unable to save part mesh " << path.str() << "." << endl;
+
+		// draw the mesh
+		MeshDrawer drawer;
+		const Vector3 vo(0,0,0);
+		const Vector3 vp(-3,5,10);
+		const Vector3 vx = TwoVector3(Vector3(0,1,0), vp-vo).dual().unit() / 2.0;
+		const Vector3 vy = TwoVector3(vp-vo, vx).dual().unit() / 2.0;
+		drawer.initPosition(Vector4(vp,0), Vector4(vo,0), Vector4(vx,0), Vector4(vy,0));
+		drawer.initSvg(500, 500);
+		//drawer.drawPrimalEdges(mesh, Vector3(1,0,0));
+		drawer.drawBoundaryFaces(pmesh, Vector3(1,0.5,0.5));
+		Text picpath;
+		picpath << "mesh_" << i << ".svg";
+		drawer.saveSvg(picpath.str());
+
 	}
 
 

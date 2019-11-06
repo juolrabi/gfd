@@ -13,7 +13,7 @@ MKDIR_P ?= mkdir -p
 RMDIR_R ?= $(RM) -r
 
 # source files for the program
-SOURCES := MeshSplitter.cpp $(filter-out $(LIB)/Types/MpiEasy.cpp, $(wildcard $(LIB)/Types/*.cpp)) $(wildcard $(LIB)/Mesh/*.cpp)
+SOURCES := MeshSplitter.cpp $(filter-out $(LIB)/Types/MpiEasy.cpp, $(wildcard $(LIB)/Types/*.cpp)) $(wildcard $(LIB)/Mesh/*.cpp) $(wildcard $(LIB)/Output/*.cpp)
 OBJECTS := $(addprefix $(BUILD)/,$(patsubst %.cpp,%.o,$(patsubst $(LIB)/%,%,$(SOURCES))))
 
 # general part of makefile
@@ -30,5 +30,5 @@ $(BUILD)/%.o: $(LIB)/%.cpp
 clean:
 	$(RMDIR_R) $(BUILD)
 run: $(BUILD)/$(TARGET)
-	cd $(BUILD); ./$(TARGET) mesh.jrm x_2 y_2; cd ../
+	cd $(BUILD); ./$(TARGET) mesh.jrm splitx_2 splity_2; cd ../
 

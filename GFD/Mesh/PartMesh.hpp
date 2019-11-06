@@ -23,6 +23,7 @@ public:
 	void createPart(const Mesh &mesh, const Buffer<uint> &npart, 
 		const Buffer<uint> &epart = Buffer<uint>(), const Buffer<uint> &fpart = Buffer<uint>(), 
 		const Buffer<uint> &bpart = Buffer<uint>(), const Buffer<uint> &qpart = Buffer<uint>());
+//	void createPart(const Mesh &mesh, const Buffer< pair<uint,uint> > &extn, const Buffer<uint> &repeat = Buffer<uint>()); 
 	void createCombined(Buffer<const PartMesh *> &mesh);
 
 	uint getPart() const { return m_part; }
