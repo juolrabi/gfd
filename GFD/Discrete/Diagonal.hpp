@@ -1,6 +1,7 @@
-/*
-Diagonal.hpp implements a diagonal matrix. The diagonal matrix can be sparse or full of values.
-*/
+/**
+ * Diagonal.hpp implements a diagonal matrix. The diagonal matrix can be sparse or full of values.
+ * Author: Jukka Räbinä, University of Jyväskylä, 2019.
+ */
 
 #ifndef _DIAGONAL_HPP_INCLUDED_
 #define _DIAGONAL_HPP_INCLUDED_

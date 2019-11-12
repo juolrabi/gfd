@@ -56,6 +56,12 @@ public:
 	void setExternalBodies(const Buffer< pair<uint,uint> > &ext){ m_extb = ext; }
 	void setExternalQuads(const Buffer< pair<uint,uint> > &ext) { m_extq = ext; }
 
+	const Buffer< pair<uint,uint> > &getExternalNodes() const { return m_extn; }
+	const Buffer< pair<uint,uint> > &getExternalEdges() const { return m_exte; }
+	const Buffer< pair<uint,uint> > &getExternalFaces() const { return m_extf; }
+	const Buffer< pair<uint,uint> > &getExternalBodies() const { return m_extb; }
+	const Buffer< pair<uint,uint> > &getExternalQuads() const { return m_extq; }
+
 protected:
 
 	uint m_part; // current part

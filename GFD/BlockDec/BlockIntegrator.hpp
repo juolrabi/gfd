@@ -8,7 +8,7 @@ BlockIntegrator.hpp implements DeRham map (integrates continuous function into d
 #include "../Discrete/Form.hpp"
 #include "../Mesh/PartMesh.hpp"
 
-#include "../Types/MpiEasy.hpp"
+//#include "../Types/MpiEasy.hpp"
 
 namespace gfd
 {
@@ -31,8 +31,7 @@ public:
 	void init(const FormGrade grade, const PartMesh &mesh, const uint num = 2);
 	void initWedge(const FormGrade grade, const PartMesh &mesh, const uint num = 2);
 	const Buffer< pair<uint,uint> > &getExternal() const { return m_ext; }
-	template<typename T> void integrate(void func(const Vector4 &, T *result), const Vector4 &p0, T *result, const Buffer<T *> &exterm) const
-	{
+	template<typename T> void integrate(void func(const Vector4 &, T *result), const Vector4 &p0, T *result, const Buffer<T *> &exterm) const {
 		Buffer<T> f(m_fields);
 		for(uint i=0; i<m_setter.size(); i++)
 		{
@@ -62,20 +61,6 @@ protected:
 	uint m_values; // number of discrete values to be used
 	Buffer< Buffer<double> > m_setter;
 	Buffer< pair<uint,uint> > m_ext;
-
-	void gatherQuadrature(const Vector4 &p, const double w, Buffer<double> &q, uint &qs) const;
-	void gatherQuadrature(const Buffer<Vector4> &p, const double w, const uint num, Buffer<double> &q, uint &qs) const;
-	void gatherVector(const Vector4 &v, Buffer<double> &q, uint &qs) const;
-	void gatherVector(const TwoVector4 &v, Buffer<double> &q, uint &qs) const;
-	void gatherVector(const ThreeVector4 &v, Buffer<double> &q, uint &qs) const;
-	void gatherVector(const FourVector4 &v, Buffer<double> &q, uint &qs) const;
-/*	void gatherDualVector(const Vector4 &v, Buffer<double> &q, uint &qs) const;
-	void gatherDualVector(const TwoVector4 &v, Buffer<double> &q, uint &qs) const;
-	void gatherDualVector(const ThreeVector4 &v, Buffer<double> &q, uint &qs) const;
-	void gatherDualVector(const FourVector4 &v, Buffer<double> &q, uint &qs) const;
-*/	template<typename V> void createQuadrature(Buffer<double> &q, const Buffer<Vector4> &p, const uint ps, const Buffer<V> &v, const uint vs, const uint num, const bool dual) const;
-	void createProductQuadrature(Buffer<double> &q, const Buffer<double> &prim, const Buffer<double> &dual, const Vector4 &p0) const;
-
 };
 
 }

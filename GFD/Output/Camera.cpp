@@ -339,11 +339,11 @@ void Camera::drawPictureTriangle(const Vector3 &t0, const Vector3 &t1, const Vec
 			if(dist > m_pic->getColor(x,y).t)
 			{
 				Vector3 col = col0 + x * colx + y * coly;
-				if(col.x < 0.0) col.x = 0.0;
+				if(col.x < -1.0) col.x = -1.0;
 				else if(col.x > 1.0) col.x = 1.0;
-				if(col.y < 0.0) col.y = 0.0;
+				if(col.y < -1.0) col.y = -1.0;
 				else if(col.y > 1.0) col.y = 1.0;
-				if(col.z < 0.0) col.z = 0.0;
+				if(col.z < -1.0) col.z = -1.0;
 				else if(col.z > 1.0) col.z = 1.0;
 				m_pic->setColor(x, y, Vector4(col, dist));
 			}

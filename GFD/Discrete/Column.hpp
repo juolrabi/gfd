@@ -1,6 +1,7 @@
-/*
-Column.hpp implements a column vector. The column vector can be sparse or full of values.
-*/
+/**
+ * Column.hpp implements a column vector. The column vector can be sparse or full of values.
+ * Author: Jukka Räbinä, University of Jyväskylä, 2019.
+ */
 
 #ifndef _COLUMN_HPP_INCLUDED_
 #define _COLUMN_HPP_INCLUDED_

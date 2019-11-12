@@ -1,6 +1,7 @@
-/*
-Discrete.hpp implements a class, where to inherit discrete form, discrete Hodge, discrete exterior derivative etc.
-*/
+/**
+ * Discrete.hpp implements a class, where to inherit discrete form, discrete Hodge, discrete exterior derivative etc.
+ * Author: Jukka Räbinä, University of Jyväskylä, 2019.
+ */
 
 #ifndef _DISCRETE_HPP_INCLUDED_
 #define _DISCRETE_HPP_INCLUDED_

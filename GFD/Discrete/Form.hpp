@@ -1,6 +1,7 @@
-/*
-Form.hpp introduce struct FormGrade and acronyms Form, Hodge, and Derivative
-*/
+/**
+ * Form.hpp introduce struct FormGrade and acronyms Form, Hodge, and Derivative.
+ * Author: Jukka Räbinä, University of Jyväskylä, 2019.
+ */
 
 #ifndef _FORM_HPP_INCLUDED_
 #define _FORM_HPP_INCLUDED_

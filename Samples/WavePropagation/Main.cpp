@@ -5,6 +5,7 @@
 #include "../../GFD/Types/Buffer.hpp"
 #include "../../GFD/Types/MpiEasy.hpp"
 #include "../../GFD/Discrete/Split.hpp"
+#include "../../GFD/Discrete/Dec.hpp"
 #include <iostream>
 
 using namespace std;
@@ -21,16 +22,22 @@ void plusScalarTimesScalar(double *result, const double *left, const double *rig
 
 void get0Form(const Vector4 &p, double *result)
 {
-//	result[0] = cos(3*p.lensq());
-//	result[0] = p.x;
-
-
 	const double plen = 3.0 * p.len();
 	if(plen < 1.0) result[0] = 3.0 * (1.0 + cos(PI * plen));
 	else result[0] = 0.0;
-//	result[1] = 0.0;
-//	result[2] = 0.0;
-//	Dx cos(3*x*x+3*y*y) = 6x*sin()
+}
+
+void get1(const Vector4 &p, double *result) {
+	result[0] = cos(3*p.lensq());
+}
+void get2(const Vector4 &p, double *result) {
+	result[0] = cos(3*p.lensq());
+	result[1] = sin(1*p.lensq());
+}
+void get3(const Vector4 &p, double *result) {
+	result[0] = cos(3*p.lensq());
+	result[1] = sin(1*p.lensq());
+	result[2] = p.lensq();
 }
 
 void get1Form(const Vector4 &p, double *result)
@@ -116,6 +123,58 @@ int main()
 	// create a PartMesh from BlockMesh
 	PartMesh mesh(getMPIrank(), getMPIranks(), 2);
 	bm.toMesh(mesh);
+
+{
+	FormGrade grade = fg_dual2;
+	FormGrade dgrade = FormGradeDeriv(grade);
+	const uint num = 10;
+	Form<double> f0;
+	bm.integrateForm(grade, get1, num, f0);
+	Derivative d0;
+	bm.integrateDerivative(grade, d0);
+	Form<double> f1;
+	f1.setTimes(d0, f0);
+
+	Dec dec(mesh);
+	Form<double> decf0;
+	dec.integrateForm(grade, get1, num, decf0);
+	Derivative decd0;
+	dec.integrateDerivative(grade, decd0);
+	Form<double> decf1;
+	decf1.setTimes(decd0, decf0);
+
+	double sum = 0.0;
+	for(uint j=0; j<f1.m_height; j++) {
+		const double dif = f1.getValue(j) - decf1.getValue(j);
+		sum += dif * dif;
+	}
+	sumMPI(&sum, 1);
+
+	// draw f0 at the end
+	double check = 0.0;
+	Picture pic0(500,500);
+	Buffer<double> val(3, 0.0);
+	for(uint j=0; j<pic0.getHeight(); j++) {
+		for(uint i=0; i<pic0.getWidth(); i++) {
+			const Vector4 p(0.006 * i - 1.0, 0.006 * j - 1.0,0,0);
+			bm.interpolateForm(dgrade, f1, p, val);
+			sumMPI(&val[0], val.size());
+			const Vector4 col((val.size() > 0 ? val[0] : 0.0), (val.size() > 1 ? val[1] : 0.0), (val.size() > 2 ? val[2] : 0.0), 1.0);
+			check += col.toVector3().len();
+			pic0.setColor(i, j, col);
+		}
+	}
+	if(getMPIrank() == 0) {
+		cout << "sum = " << sum << endl;
+		cout << "check = " << check << endl;
+		pic0.save("kuva.bmp", true);
+	}
+}
+
+	finalizeMPI();
+
+    return 0;
+
 
 	// draw the mesh
 	MeshDrawer drawer;

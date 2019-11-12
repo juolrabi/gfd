@@ -74,6 +74,7 @@ bool flagSplit(const Mesh &mesh, Buffer<uint> &npart, Buffer<uint> &epart, Buffe
 	Buffer< Buffer<uint> > flag(parts);
 	for(i=0; i<npart.size(); i++) {
 		if(npart[i] < parts) flag[npart[i]].gatherOnce(mesh.getNodeFlag(i), flags[npart[i]]);
+		if(npart[i] < parts) cout << "flag " << mesh.getNodeFlag(i) << endl;
 	}
 	Buffer<uint> part0(parts, 0);
 	for(i=1; i<parts; i++) part0[i] = part0[i-1] + flags[i-1];
@@ -355,7 +356,9 @@ int main(int argc, const char* argv[])
 		cout << "Unable to load mesh " << argv[1] << endl;
 		cout << "We create a cubic mesh for testing purposes. Please try again." << endl;
 		BuilderMesh bmesh(3);
-		bmesh.createGrid(Vector4(-0.3,-0.3,0,0), Vector4(0.3,0.3,0,0), 0.1);
+		bmesh.createGrid(Vector4(-1,-1,0,0), Vector4(1,1,0,0), 0.1);
+		bmesh.fillRectangleFlags(Vector4(-0.25,-0.25,-0.25,-0.25), Vector4(0.25,0.25,0.25,0.25), 1);
+		bmesh.fillRectangleFlags(Vector4(0.45,-0.05,-0.05,-0.05), Vector4(0.95,0.45,0.45,0.45), 2);
 		bmesh.saveJRMesh(argv[1]);
 		return 0;
 	}
@@ -371,7 +374,7 @@ int main(int argc, const char* argv[])
 	for(int ai=2; ai<argc; ai++) {
 		string line = argv[ai];
 		
-		if(line.substr(0, 4).compare("flagsplit") == 0) {
+		if(line.substr(0, 9).compare("flagsplit") == 0) {
 			if(flagSplit(mesh, npart, epart, fpart, bpart, qpart, parts)) 
 				cout << "Command " << line << " succeeded." << endl;
 			else cout << "Command " << line << " failed!" << endl;
@@ -383,16 +386,16 @@ int main(int argc, const char* argv[])
 		if(checkSplit(line, "splitz_", valuez, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
 		if(checkSplit(line, "splitt_", valuet, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
 		if(checkSplit(line, "splitr_", radius, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
-		if(checkSplit(line, "repeatpolarxy_", polarxy, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
-		if(checkSplit(line, "repeatpolarxz_", polarxz, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
-		if(checkSplit(line, "repeatpolarxt_", polarxt, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
-		if(checkSplit(line, "repeatpolaryz_", polaryz, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
-		if(checkSplit(line, "repeatpolaryt_", polaryt, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
-		if(checkSplit(line, "repeatpolarzt_", polarzt, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
-		if(checkSplit(line, "repeatazimuthx_", azimuthx, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
-		if(checkSplit(line, "repeatazimuthy_", azimuthy, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
-		if(checkSplit(line, "repeatazimuthz_", azimuthz, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
-		if(checkSplit(line, "repeatazimutht_", azimutht, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "splitpolarxy_", polarxy, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "splitpolarxz_", polarxz, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "splitpolarxt_", polarxt, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "splitpolaryz_", polaryz, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "splitpolaryt_", polaryt, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "splitpolarzt_", polarzt, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "splitazimuthx_", azimuthx, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "splitazimuthy_", azimuthy, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "splitazimuthz_", azimuthz, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
+		if(checkSplit(line, "splitazimutht_", azimutht, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
 
 		if(checkRepeat(line, "repeatx_", valuex, _valuex, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
 		if(checkRepeat(line, "repeaty_", valuey, _valuey, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
@@ -411,23 +414,6 @@ int main(int argc, const char* argv[])
 		if(checkRepeat(line, "repeatazimutht_", azimutht, _azimutht, mesh, npart, epart, fpart, bpart, qpart, parts)) continue;
 		cout << "Unknown argument: " << line << "." << endl;
 	}
-
-	for(i=0; i<npart.size(); i++) {
-		if(i % 7 == 0) cout << endl;
-		cout << npart[i] << " ";
-		
-	} 
-	cout << endl << endl;
-	for(i=0; i<epart.size(); i++) {
-		if(i % 7 == 0) cout << endl;
-		cout << epart[i] << " ";
-	} 
-	cout << endl << endl;
-	for(i=0; i<fpart.size(); i++) {
-		if(i % 6 == 0) cout << endl;
-		cout << fpart[i] << " ";
-	} 
-	cout << endl << endl;
 
 	// save part meshes
 	for(i=0; i<parts; i++) {
@@ -451,127 +437,7 @@ int main(int argc, const char* argv[])
 		Text picpath;
 		picpath << "mesh_" << i << ".svg";
 		drawer.saveSvg(picpath.str());
-
 	}
-
-
-
-/*	// run by command arguments
-	// first load mesh
-	MeshSplitter mesh;
-	if(mesh.loadJRMesh(argv[1])) std::cout << "Mesh loaded succesfully." << std::endl;
-	else
-	{
-		std::cout << "Unable to load mesh " << argv[1] << std::endl;
-		return 0;
-	}
-
-	Vector3 pmin(-1e30, -1e30, -1e30);
-	Vector3 pmax(1e30, 1e30, 1e30);
-	for(int i=2; i<argc; i++)
-	{
-		std::string line = argv[i];
-		if(line.substr(0, 4).compare("flag") == 0)
-		{
-			const uint val = getUint(line.substr(4), 1);
-			uint pow = 1;
-			while(pow < val) pow *= 2;
-			if(pow > 1024 || pow != val)
-			{
-				std::cout << "Flag-split value must be a power of 2 and at most 1024." << std::endl;
-				return 0;
-			}
-			if(mesh.divideByFlag(val)) std::cout << "Flag-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Flag-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 1).compare("x") == 0)
-		{
-			const uint val = getUint(line.substr(1), 2);
-			if(mesh.divide(val, valuex)) std::cout << "X-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "X-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 1).compare("y") == 0)
-		{
-			const uint val = getUint(line.substr(1), 2);
-			if(mesh.divide(val, valuey)) std::cout << "Y-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Y-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 1).compare("z") == 0)
-		{
-			const uint val = getUint(line.substr(1), 2);
-			if(mesh.divide(val, valuez)) std::cout << "Z-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Z-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 6).compare("polarx") == 0)
-		{
-			const uint val = getUint(line.substr(6), 2);
-			if(mesh.divide(val, polarx)) std::cout << "Polar X-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Polar X-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 6).compare("polary") == 0)
-		{
-			const uint val = getUint(line.substr(6), 2);
-			if(mesh.divide(val, polary)) std::cout << "Polar Y-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Polar Y-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 6).compare("polarz") == 0)
-		{
-			const uint val = getUint(line.substr(6), 2);
-			if(mesh.divide(val, polarz)) std::cout << "Polar Z-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Polar Z-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 8).compare("azimuthx") == 0)
-		{
-			const uint val = getUint(line.substr(8), 2);
-			if(mesh.divide(val, polarx)) std::cout << "Azimuth X-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Azimuth X-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 8).compare("azimuthy") == 0)
-		{
-			const uint val = getUint(line.substr(8), 2);
-			if(mesh.divide(val, polary)) std::cout << "Azimuth Y-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Azimuth Y-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 8).compare("azimuthz") == 0)
-		{
-			const uint val = getUint(line.substr(8), 2);
-			if(mesh.divide(val, polarz)) std::cout << "Azimuth Z-split succeeded into " << val << " components." << std::endl;
-			else std::cout << "Azimuth Z-split failed!" << std::endl;
-		}
-		else if(line.substr(0, 4).compare("minx") == 0)
-		{
-			pmin.x = getDouble(line.substr(4), 0.0);
-		}
-		else if(line.substr(0, 4).compare("maxx") == 0)
-		{
-			pmax.x = getDouble(line.substr(4), 0.0);
-		}
-		else if(line.substr(0, 4).compare("miny") == 0)
-		{
-			pmin.y = getDouble(line.substr(4), 0.0);
-		}
-		else if(line.substr(0, 4).compare("maxy") == 0)
-		{
-			pmax.y = getDouble(line.substr(4), 0.0);
-		}
-		else if(line.substr(0, 4).compare("minz") == 0)
-		{
-			pmin.z = getDouble(line.substr(4), 0.0);
-		}
-		else if(line.substr(0, 4).compare("maxz") == 0)
-		{
-			pmax.z = getDouble(line.substr(4), 0.0);
-		}
-		else if(line.substr(0, 6).compare("repeat") == 0)
-		{
-			if(mesh.restrictArea(pmin, pmax)) std::cout << "Repeat area set between (" << pmin.x << ", " << pmin.y << ", " << pmin.z << ") and (" << pmax.x << ", " << pmax.y << ", " << pmax.z << ")." << std::endl;
-			else std::cout << "Failed to set repeat area!" << std::endl;
-		}
-	}
-
-	if(mesh.saveSplit(argv[1])) std::cout << "Splitted mesh saved succesfully." << std::endl;
-	else std::cout << "Unable to save mesh " << argv[1] << std::endl;
-*/
 	return 0;
 }
 

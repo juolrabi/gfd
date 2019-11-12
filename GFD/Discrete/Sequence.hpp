@@ -1,7 +1,8 @@
-/*
-Sequence.hpp implements class Sequence, which contains a sequence of Operations.
-Operation is a general representation for any matrix multiplication kind of operation.
-*/
+/**
+ * Sequence.hpp implements class Sequence, which contains a sequence of Operations.
+ * Operation is a general representation for any matrix multiplication kind of operation.
+ * Author: Jukka Räbinä, University of Jyväskylä, 2019.
+ */
 
 #ifndef _SEQUENCE_HPP_INCLUDED_
 #define _SEQUENCE_HPP_INCLUDED_

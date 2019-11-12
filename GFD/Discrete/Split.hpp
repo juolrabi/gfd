@@ -1,6 +1,7 @@
-/*
-Split.hpp implement split classes of Column, Diagonal, and Sparse
-*/
+/**
+ * Split.hpp implement split classes of Column, Diagonal, and Sparse.
+ * Author: Jukka Räbinä, University of Jyväskylä, 2019.
+ */
 
 #ifndef _SPLIT_HPP_INCLUDED_
 #define _SPLIT_HPP_INCLUDED_

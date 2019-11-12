@@ -1,6 +1,7 @@
-/*
-Sparse.hpp implements a sparse matrix operator that operates discrete forms (class Form)
-*/
+/**
+ * Sparse.hpp implements a sparse matrix operator that operates discrete forms (class Form)
+ * Author: Jukka Räbinä, University of Jyväskylä, 2019.
+ */
 
 #ifndef _SPARSE_HPP_INCLUDED_
 #define _SPARSE_HPP_INCLUDED_
