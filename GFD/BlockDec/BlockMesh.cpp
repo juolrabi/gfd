@@ -1954,7 +1954,7 @@ uint BlockMesh::getVectors(const FormGrade grade, Buffer<double> &result) const
 
 	// integrate over mesh elements
 	map<Type, BlockIntegrator*> blocks;
-	createFormIntegrator(grade, blocks, 2);
+	createFormIntegrator(grade, blocks, 0);
 
 	// reserve space for external terms
 	const bool dual = FormGradeIsDual(grade);
@@ -2003,19 +2003,6 @@ uint BlockMesh::getVectors(const FormGrade grade, Buffer<double> &result) const
 		{
 			recvMPI(&addition[0], fields * sizeof(double), mext[j].first, 0);
 			const uint jj = fields * mext[j].second;
-
-/*			double dot = 0.0;
-			for(k=0; k<fields; k++) dot += result[jj + k] * addition[k];
-			if(dot < 1e-8) {
-				double sumres = 0.0;
-				double sumadd = 0.0;
-				double sumsum = 0.0;
-				for(k=0; k<fields; k++) sumres += result[jj + k] * result[jj + k];
-				for(k=0; k<fields; k++) sumadd += addition[k] * addition[k];
-				for(k=0; k<fields; k++) sumsum += (result[jj + k] + addition[k]) * (result[jj + k] + addition[k]);
-				cout << "DOT " << dot << " " << sumres << " " << sumadd << " " << sumsum << endl;
-			}
-*/
 			for(k=0; k<fields; k++) result[jj + k] += addition[k];
 		}
 	}

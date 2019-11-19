@@ -39,133 +39,170 @@ const Buffer< pair<uint,uint> > &MeshIntegrator::getExternals() const {
 	return m_mesh.getExternalQuads();
 }
 
-void MeshIntegrator::getSetter(const uint i, Buffer<double> &q) const {
+void MeshIntegrator::gatherSetter0(const uint i, Buffer<double> &q, uint &qs) const {
+	if(m_grade == fg_prim0) q.gather(1.0, qs);
+	else if(m_grade == fg_dual0) gatherVector(m_mesh.getNodeDualVector(i).dualof(), q, qs);
+	else if(m_grade == fg_prim1) gatherVector(m_mesh.getEdgeVector(i), q, qs);
+	else if(m_grade == fg_dual1) gatherVector(m_mesh.getEdgeDualVector(i).dualof(), q, qs);
+	else if(m_grade == fg_prim2) gatherVector(m_mesh.getFaceVector(i), q, qs);
+	else if(m_grade == fg_dual2) gatherVector(m_mesh.getFaceDualVector(i).dualof(), q, qs);
+	else if(m_grade == fg_prim3) gatherVector(m_mesh.getBodyVector(i), q, qs);
+	else if(m_grade == fg_dual3) gatherVector(m_mesh.getBodyDualVector(i).dualof(), q, qs);
+	else if(m_grade == fg_prim4) gatherVector(m_mesh.getQuadVector(i), q, qs);
+	else if(m_grade == fg_dual4) q.gather(m_mesh.getQuadDualVector(i), qs);
+}
+
+void MeshIntegrator::gatherWedgeSetter0(const uint i, Buffer<double> &q, uint &qs) const {
+	uint prims = 0;
+	Buffer<double> prim;
+	uint duals = 0;
+	Buffer<double> dual;
+	const uint gdim = FormGradeDimension(m_grade);
+	if(gdim == 0) gatherVector(m_mesh.getNodeDualVector(i).dualof(), q, qs);
+	else if(gdim == 1) {
+		gatherVector(m_mesh.getEdgeVector(i), prim, prims);
+		gatherVector(m_mesh.getEdgeDualVector(i).dualof(), dual, duals);
+		gatherWedgeQuadrature(prim, prims, dual, duals, Vector4(0,0,0,0), q, qs);
+	} 
+	else if(gdim == 2) {
+		gatherVector(m_mesh.getFaceVector(i), prim, prims);
+		gatherVector(m_mesh.getFaceDualVector(i).dualof(), dual, duals);
+		gatherWedgeQuadrature(prim, prims, dual, duals, Vector4(0,0,0,0), q, qs);
+	}
+	else if(gdim == 3) {
+		gatherVector(m_mesh.getBodyVector(i), prim, prims);
+		gatherVector(m_mesh.getBodyDualVector(i).dualof(), dual, duals);
+		gatherWedgeQuadrature(prim, prims, dual, duals, Vector4(0,0,0,0), q, qs);
+	}
+	else if(gdim == 4) {
+		FourVector4 v = m_mesh.getQuadVector(i);
+		if(v.dual() < 0.0) v = -v; // divide with QuadDualVector
+		gatherVector(v, q, qs);
+	}
+}
+
+void MeshIntegrator::gatherSetter(const uint i, Buffer<double> &q, uint &qs) const {
+	if(m_num == 0) {
+		gatherSetter0(i, q, qs);
+		return;
+	}
 	Buffer<Vector4> p;
 	uint ps = 0;
 	uint vs = 0;
 	if(m_grade == fg_prim0) {
-		uint qs = 0;
 		q.gather(1.0, qs);
-		if(m_num > 0) gatherQuadrature(m_mesh.getNodePosition(i), 1.0, q, qs);
-		q.resize(qs);
+		gatherQuadrature(m_mesh.getNodePosition(i), 1.0, q, qs);
 	}
 	else if(m_grade == fg_dual0) {
 		Buffer<FourVector4> v;
-		if(m_num == 0) v.gather(m_mesh.getNodeDualVector(i), vs);
-		else m_mesh.gatherNodeDualSimplices(i, p, ps, v, vs);
-		createQuadrature(q, p, ps, v, vs, true);
+		m_mesh.gatherNodeDualSimplices(i, p, ps, v, vs);
+		gatherQuadrature(p, ps, v, vs, true, q, qs);
 	}
 	else if(m_grade == fg_prim1) {
 		Buffer<Vector4> v;
-		if(m_num == 0) v.gather(m_mesh.getEdgeVector(i), vs);
-		else m_mesh.gatherEdgeSimplices(i, p, ps, v, vs);
-		createQuadrature(q, p, ps, v, vs, false);
+		m_mesh.gatherEdgeSimplices(i, p, ps, v, vs);
+		gatherQuadrature(p, ps, v, vs, false, q, qs);
 	}
 	else if(m_grade == fg_dual1) {
 		Buffer<ThreeVector4> v;
-		if(m_num == 0) v.gather(m_mesh.getEdgeDualVector(i), vs);
-		else m_mesh.gatherEdgeDualSimplices(i, p, ps, v, vs);
-		createQuadrature(q, p, ps, v, vs, true);
+		m_mesh.gatherEdgeDualSimplices(i, p, ps, v, vs);
+		gatherQuadrature(p, ps, v, vs, true, q, qs);
 	}
 	else if(m_grade == fg_prim2) {
 		Buffer<TwoVector4> v;
-		if(m_num == 0) v.gather(m_mesh.getFaceVector(i), vs);
-		else m_mesh.gatherFaceSimplices(i, p, ps, v, vs);
-		createQuadrature(q, p, ps, v, vs, false);
+		m_mesh.gatherFaceSimplices(i, p, ps, v, vs);
+		gatherQuadrature(p, ps, v, vs, false, q, qs);
 	}
 	else if(m_grade == fg_dual2) {
 		Buffer<TwoVector4> v;
-		if(m_num == 0) v.gather(m_mesh.getFaceDualVector(i), vs);
-		else m_mesh.gatherFaceDualSimplices(i, p, ps, v, vs);
-		createQuadrature(q, p, ps, v, vs, true);
+		m_mesh.gatherFaceDualSimplices(i, p, ps, v, vs);
+		gatherQuadrature(p, ps, v, vs, true, q, qs);
 	}
 	else if(m_grade == fg_prim3) {
 		Buffer<ThreeVector4> v;
-		if(m_num == 0) v.gather(m_mesh.getBodyVector(i), vs);
-		else m_mesh.gatherBodySimplices(i, p, ps, v, vs);
-		createQuadrature(q, p, ps, v, vs, false);
+		m_mesh.gatherBodySimplices(i, p, ps, v, vs);
+		gatherQuadrature(p, ps, v, vs, false, q, qs);
 	}
 	else if(m_grade == fg_dual3) {
 		Buffer<Vector4> v;
-		if(m_num == 0) v.gather(m_mesh.getBodyDualVector(i), vs);
-		else m_mesh.gatherBodyDualSimplices(i, p, ps, v, vs);
-		createQuadrature(q, p, ps, v, vs, true);
+		m_mesh.gatherBodyDualSimplices(i, p, ps, v, vs);
+		gatherQuadrature(p, ps, v, vs, true, q, qs);
 	}
 	else if(m_grade == fg_prim4) {
 		Buffer<FourVector4> v;
-		if(m_num == 0) v.gather(m_mesh.getQuadVector(i), vs);
-		else m_mesh.gatherQuadSimplices(i, p, ps, v, vs);
-		createQuadrature(q, p, ps, v, vs, false);
+		m_mesh.gatherQuadSimplices(i, p, ps, v, vs);
+		gatherQuadrature(p, ps, v, vs, false, q, qs);
 	}
 	else if(m_grade == fg_dual4) {
-		uint qs = 0;
 		q.gather(m_mesh.getQuadDualVector(i), qs);
-		if(m_num > 0) gatherQuadrature(m_mesh.getQuadPosition(i), 1.0, q, qs);
-		q.resize(qs);
+		gatherQuadrature(m_mesh.getQuadPosition(i), 1.0, q, qs);
 	}
 }
 
-void MeshIntegrator::getWedgeSetter(const uint i, Buffer<double> &q) const {
-	Buffer<Vector4> p;
-	Buffer<Vector4> dp;
+void MeshIntegrator::gatherWedgeSetter(const uint i, Buffer<double> &q, uint &qs) const {
+	if(m_num == 0) {
+		gatherWedgeSetter0(i, q, qs);
+		return;
+	}
+	
 	uint ps = 0;
 	uint vs = 0;
+	Buffer<Vector4> p;
 	uint dps = 0;
 	uint dvs = 0;
+	Buffer<Vector4> dp;
+	uint prims = 0;
 	Buffer<double> prim;
+	uint duals = 0;
 	Buffer<double> dual;
 	const uint gdim = FormGradeDimension(m_grade);
 	if(gdim == 0) {
 		Buffer<FourVector4> v;
-		if(m_num == 0) v.gather(m_mesh.getNodeDualVector(i), vs);
-		else m_mesh.gatherNodeDualSimplices(i, p, ps, v, vs);
-		createQuadrature(q, p, ps, v, vs, true);
+		m_mesh.gatherNodeDualSimplices(i, p, ps, v, vs);
+		gatherQuadrature(p, ps, v, vs, true, q, qs);
 	}
 	else if(gdim == 1) {
 		Buffer<Vector4> v;
-		if(m_num == 0) v.gather(m_mesh.getEdgeVector(i), vs);
-		else m_mesh.gatherEdgeSimplices(i, p, ps, v, vs);
-		createQuadrature(prim, p, ps, v, vs, false);
+		m_mesh.gatherEdgeSimplices(i, p, ps, v, vs);
+		gatherQuadrature(p, ps, v, vs, false, prim, prims);
 
 		Buffer<ThreeVector4> dv;
-		if(m_num == 0) dv.gather(m_mesh.getEdgeDualVector(i), dvs);
-		else m_mesh.gatherEdgeDualSimplices(i, dp, dps, dv, dvs);
-		createQuadrature(dual, dp, dps, dv, dvs, true);
+		m_mesh.gatherEdgeDualSimplices(i, dp, dps, dv, dvs);
+		gatherQuadrature(dp, dps, dv, dvs, true, dual, duals);
 
-		createWedgeQuadrature(q, prim, dual, m_mesh.getEdgePosition(i));
+		gatherWedgeQuadrature(prim, prims, dual, duals, m_mesh.getEdgePosition(i), q, qs);
 	}
 	else if(gdim == 2) {
 		Buffer<TwoVector4> v;
-		if(m_num == 0) v.gather(m_mesh.getFaceVector(i), vs);
-		else m_mesh.gatherFaceSimplices(i, p, ps, v, vs);
-		createQuadrature(prim, p, ps, v, vs, false);
+		m_mesh.gatherFaceSimplices(i, p, ps, v, vs);
+		gatherQuadrature(p, ps, v, vs, false, prim, prims);
 
 		Buffer<TwoVector4> dv;
-		if(m_num == 0) dv.gather(m_mesh.getFaceDualVector(i), dvs);
-		else m_mesh.gatherFaceDualSimplices(i, dp, dps, dv, dvs);
-		createQuadrature(dual, dp, dps, dv, dvs, true);
+		m_mesh.gatherFaceDualSimplices(i, dp, dps, dv, dvs);
+		gatherQuadrature(dp, dps, dv, dvs, true, dual, duals);
 
-		createWedgeQuadrature(q, prim, dual, m_mesh.getFacePosition(i));
+		gatherWedgeQuadrature(prim, prims, dual, duals, m_mesh.getFacePosition(i), q, qs);
 	}
 	else if(gdim == 3) {
 		Buffer<ThreeVector4> v;
-		if(m_num == 0) v.gather(m_mesh.getBodyVector(i), vs);
-		else m_mesh.gatherBodySimplices(i, p, ps, v, vs);
-		createQuadrature(prim, p, ps, v, vs, false);
+		m_mesh.gatherBodySimplices(i, p, ps, v, vs);
+		gatherQuadrature(p, ps, v, vs, false, prim, prims);
 
 		Buffer<Vector4> dv;
-		if(m_num == 0) dv.gather(m_mesh.getBodyDualVector(i), dvs);
-		else m_mesh.gatherBodyDualSimplices(i, dp, dps, dv, dvs);
-		createQuadrature(dual, dp, dps, dv, dvs, true);
+		m_mesh.gatherBodyDualSimplices(i, dp, dps, dv, dvs);
+		gatherQuadrature(dp, dps, dv, dvs, true, dual, duals);
 
-		createWedgeQuadrature(q, prim, dual, m_mesh.getBodyPosition(i));
+		gatherWedgeQuadrature(prim, prims, dual, duals, m_mesh.getBodyPosition(i), q, qs);
 	}
 	else {
 		Buffer<FourVector4> v;
-		if(m_num == 0) v.gather(m_mesh.getQuadVector(i), vs);
-		else m_mesh.gatherQuadSimplices(i, p, ps, v, vs);
-		createQuadrature(q, p, ps, v, vs, true);
-		if(q[0] < 0.0) q[0] = -q[0];
+		m_mesh.gatherQuadSimplices(i, p, ps, v, vs);
+		FourVector4 sum(0.0);
+		for(uint i=0; i<vs; i++) sum += v[i];
+		if(sum.dual() < 0.0) {
+			for(uint i=0; i<vs; i++) v[i] = -v[i];
+		}
+		gatherQuadrature(p, ps, v, vs, false, q, qs);
 	}
 }
 
@@ -268,15 +305,15 @@ void MeshIntegrator::gatherVector(const ThreeVector4 &v, Buffer<double> &q, uint
 void MeshIntegrator::gatherVector(const FourVector4 &v, Buffer<double> &q, uint &qs) const {
 	q.gather(v.xyzt, qs);
 }
-template<typename V> void MeshIntegrator::createQuadrature(Buffer<double> &q, const Buffer<Vector4> &p, const uint ps, const Buffer<V> &v, const uint vs, const bool dual) const {
+template<typename V> void MeshIntegrator::gatherQuadrature(const Buffer<Vector4> &p, const uint ps, const Buffer<V> &v, const uint vs, const bool dual, Buffer<double> &q, uint &qs) const {
 	if(vs == 0) {
-		q.resize(getFields());
-		q.fill(0.0);
+		const uint qsize = qs + getFields();
+		if(qsize > q.size()) q.resize(qsize);
+		while(qs < qsize) q[qs++] = 0.0;
 		return;
 	}
-
+	
 	// compute vector
-	uint qs = 0;
 	V sumv(v[0]);
 	for(uint i=1; i<vs; i++) sumv += v[i];
 	if(dual) gatherVector(sumv.dualof(), q, qs);
@@ -300,33 +337,22 @@ template<typename V> void MeshIntegrator::createQuadrature(Buffer<double> &q, co
 			gatherQuadrature(pp, v[i].dot(sumv), q, qs);
 		}
 	}
-	q.resize(qs);
 }
-void MeshIntegrator::createWedgeQuadrature(Buffer<double> &q, const Buffer<double> &prim, const Buffer<double> &dual, const Vector4 &p0) const {
-	uint i, j, k, l;
-
+void MeshIntegrator::gatherWedgeQuadrature(const Buffer<double> &prim, const uint prims, const Buffer<double> &dual, const uint duals, const Vector4 &p0, Buffer<double> &q, uint &qs) const {
+	uint i, j, k;
 	const uint fields = getFields();
-	const uint wfields = getWedgeFields();
 	const uint dims = m_mesh.getDimension() + 1;
-	const uint prims = (prim.size() - fields) / dims;
-	const uint duals = (dual.size() - fields) / dims;
-	q.resize(wfields + prims * duals * dims);
-	for(i=0, k=0; i<fields; i++)
-	{
-		for(j=0; j<i; j++) q[k++] = prim[i] * dual[j] + prim[j] * dual[i];
-		q[k++] = prim[i] * dual[i];
+	const uint qsize = qs + getWedgeFields() + (prims - fields) * (duals - fields) / dims;
+	if(qsize > q.size()) q.resize(qsize);
+	for(i=0; i<fields; i++) {
+		for(j=0; j<i; j++) q[qs++] = prim[i] * dual[j] + prim[j] * dual[i];
+		q[qs++] = prim[i] * dual[i];
 	}
-
 	VectorN p(p0);
-	for(i=0, k=0; i<prims; i++)
-	{
-		const uint ii = fields + dims * i;
-		for(j=0; j<duals; j++, k++)
-		{
-			const uint jj = fields + dims * j;
-			const uint kk = wfields + dims * k;
-			q[kk] = prim[ii] * dual[jj];
-			for(l=1; l<dims; l++) q[kk+l] = prim[ii+l] + dual[jj+l] - p[l-1];
+	for(i=fields; i<prims; i+=dims) {
+		for(j=fields; j<duals; j+=dims) {
+			q[qs++] = prim[i] * dual[j];
+			for(k=1; k<dims; k++) q[qs++] = prim[i+k] + dual[j+k] - p[k-1];
 		}
 	}
 }

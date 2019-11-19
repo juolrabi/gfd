@@ -15,7 +15,7 @@ Sparse<sign> &Dec::integrateDerivative(const FormGrade grade, Sparse<sign> &d) c
 		d.setFull(m_mesh.getNodeLocals(), inc, m_mesh.getExternalNodes());
 		if(grade == fg_dual1) d.setTranspose(d);
         else d.setTranspose(d.setTranspose(d));
-		return d;
+		return d; 
 	}
 	if(grade == fg_prim1 || grade == fg_dual2) {
 		Buffer< Buffer< pair<uint,sign> > > inc(m_mesh.getFaceLocals());

@@ -1,9 +1,10 @@
-/*
-Mesh is a class for partitioning a 1--4 dimensional domain with polyhedral cells.
-We use the following naming: Node = 0-cell, Edge = 1-cell, Face = 2-cell, Body = 3-cell, and Quad = 4-cell.
-Cells are constructed recursively and are linked with their boundary cells and parent cells.
-Each cell can be assigned with a flag (unsigned int)
-*/
+/**
+ * Mesh is a class for partitioning a 1--4 dimensional domain with polyhedral cells.
+ * We use the following naming: Node = 0-cell, Edge = 1-cell, Face = 2-cell, Body = 3-cell, and Quad = 4-cell.
+ * Cells are constructed recursively and are linked with their boundary cells and parent cells.
+ * Each cell can be assigned with a flag (unsigned int)
+ * Author: Jukka Räbinä, University of Jyväskylä, 2019.
+ */
 
 #ifndef _MESH_HPP_INCLUDED_
 #define _MESH_HPP_INCLUDED_
@@ -12,6 +13,9 @@ Each cell can be assigned with a flag (unsigned int)
 #include "../Types/Buffer.hpp"
 #include "../Types/Text.hpp"
 #include "../Types/UintSet.hpp"
+#include <fstream>
+
+using namespace std;
 
 namespace gfd
 {
@@ -165,10 +169,26 @@ public:
 	Vector4 getBodyAverage(const uint b) const;
 	Vector4 getQuadAverage(const uint q) const;
 
+	// primal volume vectors
+	double getEdgeVector1(const uint e) const;
+	Vector2 getEdgeVector2(const uint e) const;
+	Vector3 getEdgeVector3(const uint e) const;
+	Vector4 getEdgeVector4(const uint e) const;
+	Vector4 getEdgeVector(const uint e) const;
+	TwoVector2 getFaceVector2(const uint f) const;
+	TwoVector3 getFaceVector3(const uint f) const;
+	TwoVector4 getFaceVector4(const uint f) const;
+	TwoVector4 getFaceVector(const uint f) const;
+	ThreeVector3 getBodyVector3(const uint b) const;
+	ThreeVector4 getBodyVector4(const uint b) const;
+	ThreeVector4 getBodyVector(const uint b) const;
+	FourVector4 getQuadVector(const uint q) const;
+
 	// circumcenter determinants
 	double getNodeWeight(const uint n) const { if(n < m_w.size()) return m_w[n]; return 0.0; }
-	SymMatrix4 getMetric() const;
-	Vector4 getTransformed(const Vector4 &r) const;
+	SymMatrix4 getMetric(const uint flag = 0) const;
+	uint getMetricSize() const { return 2 * m_m.size() / (m_dim * (m_dim + 1)); }
+	Vector4 getTransformed(const Vector4 &r, const uint flag = 0) const;
 
 	// dual average positions
 	double getNodeDualAverage1(const uint n) const;
@@ -185,21 +205,6 @@ public:
 	Vector4 getFaceDualAverage(const uint f) const;
 	Vector4 getBodyDualAverage4(const uint b) const;
 	Vector4 getBodyDualAverage(const uint b) const;
-
-	// primal volume vectors
-	double getEdgeVector1(const uint e) const;
-	Vector2 getEdgeVector2(const uint e) const;
-	Vector3 getEdgeVector3(const uint e) const;
-	Vector4 getEdgeVector4(const uint e) const;
-	Vector4 getEdgeVector(const uint e) const;
-	TwoVector2 getFaceVector2(const uint f) const;
-	TwoVector3 getFaceVector3(const uint f) const;
-	TwoVector4 getFaceVector4(const uint f) const;
-	TwoVector4 getFaceVector(const uint f) const;
-	ThreeVector3 getBodyVector3(const uint b) const;
-	ThreeVector4 getBodyVector4(const uint b) const;
-	ThreeVector4 getBodyVector(const uint b) const;
-	FourVector4 getQuadVector(const uint q) const;
 
 	// dual volume vectors
 	double getNodeDualVector1(const uint n) const;
@@ -222,7 +227,7 @@ public:
 	double getQuadDualVector(const uint q) const;
 
 	// diagonal Hodge terms
-	double getNodeHodge(const uint n) const;
+/*	double getNodeHodge(const uint n) const;
 	double getNodeHodge(const uint n, const double &metric) const;
 	double getEdgeHodge(const uint e) const;
 	double getEdgeHodge(const uint e, const SymMatrix4 &metric) const;
@@ -232,16 +237,16 @@ public:
 	double getBodyHodge(const uint b, const SymThreeMatrix4 &metric) const;
 	double getQuadHodge(const uint q) const;
 	double getQuadHodge(const uint q, const SymFourMatrix4 &metric) const;
-
+*/
 	// get deviation vector from the cell plane to position p (independent of metric)
 	Vector4 getEdgeDeviation(const uint e, const Vector4 &p) const;
 	Vector4 getFaceDeviation(const uint f, const Vector4 &p) const;
 	Vector4 getBodyDeviation(const uint b, const Vector4 &p) const;
 
 	// get projection of vector d that is orthogonal to the cell (depend on the metric)
-	Vector4 getEdgeOrthogonal(const uint e, const Vector4 &d) const;
-	Vector4 getFaceOrthogonal(const uint f, const Vector4 &d) const;
-	Vector4 getBodyOrthogonal(const uint b, const Vector4 &d) const;
+	//Vector4 getEdgeOrthogonal(const uint e, const Vector4 &d) const;
+	//Vector4 getFaceOrthogonal(const uint f, const Vector4 &d) const;
+	//Vector4 getBodyOrthogonal(const uint b, const Vector4 &d) const;
 
 	// find elements
 	uint findNode(const Vector4 &p, const double zerolensq = 1e-13, uint curr = 0, const bool assured = true) const;
@@ -274,7 +279,7 @@ public:
 	void transform(const Matrix4 &mat);
 	void move(const Vector4 &vec);
 	void setNodeWeight(const uint n, const double w);
-	void setMetric(const SymMatrix4 &m);
+	void setMetric(const SymMatrix4 &m, const uint flag = 0);
 
 	// modify flags
 	void setNodeFlag(const uint n, const uint flag);
@@ -289,6 +294,21 @@ public:
 	void resizeFaceBuffer(const uint size);
 	void resizeBodyBuffer(const uint size);
 	void resizeQuadBuffer(const uint size);
+
+	Buffer<Vector4> &getEdgeSimplices(const uint e, Buffer<Vector4> &p) const;
+	Buffer<Vector4> &getFaceSimplices(const uint f, Buffer<Vector4> &p) const;
+	Buffer<Vector4> &getBodySimplices(const uint b, Buffer<Vector4> &p) const;
+	Buffer<Vector4> &getQuadSimplices(const uint q, Buffer<Vector4> &p) const;
+	Buffer<Vector4> &getEdgeNodeSimplices(const uint e, Buffer<uint> &n, Buffer<Vector4> &p) const;
+	Buffer<Vector4> &getFaceNodeSimplices(const uint f, Buffer<uint> &n, Buffer<Vector4> &p) const;
+	Buffer<Vector4> &getFaceEdgeSimplices(const uint f, Buffer<uint> &e, Buffer<Vector4> &p) const;
+	Buffer<Vector4> &getBodyNodeSimplices(const uint b, Buffer<uint> &n, Buffer<Vector4> &p) const;
+	Buffer<Vector4> &getBodyEdgeSimplices(const uint b, Buffer<uint> &e, Buffer<Vector4> &p) const;
+	Buffer<Vector4> &getBodyFaceSimplices(const uint b, Buffer<uint> &f, Buffer<Vector4> &p) const;
+	Buffer<Vector4> &getQuadNodeSimplices(const uint q, Buffer<uint> &n, Buffer<Vector4> &p) const;
+	Buffer<Vector4> &getQuadEdgeSimplices(const uint q, Buffer<uint> &e, Buffer<Vector4> &p) const;
+	Buffer<Vector4> &getQuadFaceSimplices(const uint q, Buffer<uint> &f, Buffer<Vector4> &p) const;
+	Buffer<Vector4> &getQuadBodySimplices(const uint q, Buffer<uint> &b, Buffer<Vector4> &p) const;
 
 	void gatherNodeSimplices(const uint n, Buffer<Vector4> &p, uint &ps, Buffer<double> &v, uint &vs) const;
 	void gatherEdgeSimplices(const uint e, Buffer<Vector4> &p, uint &ps, Buffer<Vector4> &v, uint &vs) const;
@@ -337,29 +357,29 @@ protected:
 	Buffer<uint> m_qflag; // quad flags (optional)
 
 	// circumcenter computation (squared distance of v is v.dot(m * v) + w)
-	Buffer<double> m_m; // symmetric matrix to determine dot product (optional)
+	Buffer<double> m_m; // symmetric matrices to determine dot product (optional)
 	Buffer<double> m_w; // node weights (optional)
 
-	double getMetric1() const { return m_m[0]; }
-	SymMatrix2 getMetric2() const { return SymMatrix2(m_m[0], m_m[1], m_m[2]); }
-	SymMatrix3 getMetric3() const { return SymMatrix3(m_m[0], m_m[1], m_m[2], m_m[3], m_m[4], m_m[5]); }
-	SymMatrix4 getMetric4() const { return SymMatrix4(m_m[0], m_m[1], m_m[2], m_m[3], m_m[4], m_m[5], m_m[6], m_m[7], m_m[8], m_m[9]); }
-	double getTransformed1(const double &r) const { return (m_m.empty() ? r : getMetric1() * r); }
-	Vector2 getTransformed2(const Vector2 &r) const { return (m_m.empty() ? r : getMetric2() * r); }
-	Vector3 getTransformed3(const Vector3 &r) const { return (m_m.empty() ? r : getMetric3() * r); }
-	Vector4 getTransformed4(const Vector4 &r) const { return (m_m.empty() ? r : getMetric4() * r); }
+	virtual const string getJRMeshType() const { return "JRM1"; }
+	virtual bool loadJRMeshMore(std::ifstream &fs) { return !fs.fail(); }
+	virtual bool saveJRMeshMore(std::ofstream &fs) const { return !fs.fail(); }
+	Vector2 getCellPosition2(const Buffer<uint> &n, const uint flag, const SymMatrix2 &a0) const;
+	Vector3 getCellPosition3(const Buffer<uint> &n, const uint flag, const SymMatrix3 &a0) const;
+	Vector4 getCellPosition4(const Buffer<uint> &n, const uint flag, const SymMatrix4 &a0) const;
+	template<typename T> void setTerm(const uint i, const T &term, const T &zero, const uint bufs, Buffer<T> &buf) const;
+	double getMetric1(const uint flag) const;
+	SymMatrix2 getMetric2(const uint flag) const;
+	SymMatrix3 getMetric3(const uint flag) const;
+	SymMatrix4 getMetric4(const uint flag) const;
+	double getTransformed1(const double &r, const uint flag) const;
+	Vector2 getTransformed2(const Vector2 &r, const uint flag) const;
+	Vector3 getTransformed3(const Vector3 &r, const uint flag) const;
+	Vector4 getTransformed4(const Vector4 &r, const uint flag) const;
 
 public:
 	void orderFaceEdges(const uint f);
 	void orderBodyFaces(const uint b);
 	void orderQuadBodies(const uint q);
-/*
-	void insertQuadrature(const Vector4 &p0, const double w, Buffer<double> &q, uint &qs) const;
-	void insertQuadrature(const Vector4 &p0, const Vector4 &p1, const Vector4 &w, const double h, Buffer<double> &q, uint &qs) const;
-	void insertQuadrature(const Vector4 &p0, const Vector4 &p1, const Vector4 &p2, const TwoVector4 &w, const double h, Buffer<double> &q, uint &qs) const;
-	void insertQuadrature(const Vector4 &p0, const Vector4 &p1, const Vector4 &p2, const Vector4 &p3, const ThreeVector4 &w, const double h, Buffer<double> &q, uint &qs) const;
-	void insertQuadrature(const Vector4 &p0, const Vector4 &p1, const Vector4 &p2, const Vector4 &p3, const Vector4 &p4, const FourVector4 &w, const double h, Buffer<double> &q, uint &qs) const;
-*/
 };
 
 }

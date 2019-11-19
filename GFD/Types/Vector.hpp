@@ -482,6 +482,19 @@ public:
 	Buffer<double> val;
 };
 
+/*TwoVector2 operator*(Vector2 &l, Vector2 &r) { return TwoVector2(l, r); }
+TwoVector3 operator*(Vector3 &l, Vector3 &r) { return TwoVector3(l, r); }
+TwoVector4 operator*(Vector4 &l, Vector4 &r) { return TwoVector4(l, r); }
+
+ThreeVector3 operator*(TwoVector3 &l, Vector3 &r) { return ThreeVector3(l, r); }
+ThreeVector3 operator*(Vector3 &l, TwoVector3 &r) { return ThreeVector3(l, r); }
+ThreeVector4 operator*(TwoVector4 &l, Vector4 &r) { return ThreeVector4(l, r); }
+ThreeVector4 operator*(Vector4 &l, TwoVector4 &r) { return ThreeVector4(l, r); }
+
+FourVector4 operator*(Vector4 &l, ThreeVector4 &r) { return FourVector4(l, r); }
+FourVector4 operator*(TwoVector4 &l, TwoVector4 &r) { return FourVector4(l, r); }
+FourVector4 operator*(ThreeVector4 &l, Vector4 &r) { return FourVector4(l, r); }
+*/
 }
 
 #endif //_VECTOR_HPP_INCLUDED_

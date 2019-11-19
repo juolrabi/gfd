@@ -1,6 +1,7 @@
-/*
-PartMesh is a partitioned Mesh.
-*/
+/**
+ * PartMesh is a partitioned Mesh.
+ * Author: Jukka Räbinä, University of Jyväskylä, 2019.
+ */
 
 #ifndef _PARTMESH_HPP_INCLUDED_
 #define _PARTMESH_HPP_INCLUDED_
@@ -28,9 +29,6 @@ public:
 
 	uint getPart() const { return m_part; }
 	uint getNumberOfParts() const { return m_parts; }
-
-	bool loadJRMesh(const std::string &path);
-	bool saveJRMesh(const std::string &path) const;
 
 	uint getNodeLocals() const { return m_nsize - m_extn.size(); }
 	uint getEdgeLocals() const { return m_esize - m_exte.size(); }
@@ -73,6 +71,11 @@ protected:
 	Buffer< pair<uint,uint> > m_extf;
 	Buffer< pair<uint,uint> > m_extb;
 	Buffer< pair<uint,uint> > m_extq;
+
+	virtual const string getJRMeshType() const { return "JRMP"; }
+	virtual bool loadJRMeshMore(std::ifstream &fs);
+	virtual bool saveJRMeshMore(std::ofstream &fs) const;
+
 };
 
 }

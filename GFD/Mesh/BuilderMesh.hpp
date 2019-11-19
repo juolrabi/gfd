@@ -1,6 +1,7 @@
-/*
-BuilderMesh is a Mesh with several building routines.
-*/
+/**
+ * BuilderMesh is a Mesh with several building routines.
+ * Author: Jukka Räbinä, University of Jyväskylä, 2019.
+ */
 
 #ifndef _BUILDERMESH_HPP_INCLUDED_
 #define _BUILDERMESH_HPP_INCLUDED_
@@ -38,7 +39,7 @@ public:
 	void createA15Grid(const Vector3 &minp, const Vector3 &maxp, const double h);
 	void createC15Grid(const Vector3 &minp, const Vector3 &maxp, const double h);
 	void createZGrid(const Vector3 &minp, const Vector3 &maxp, const double h);
-	void createSphereBoundaryGrid(const double r, const double h, const uint optimizationSteps = 100, const bool integerDivision = false);
+	void createSphereBoundaryGrid(const double r, const double h, const uint optimizationSteps = 0, const bool integerDivision = false);
 	void createSphereBoundaryPentaGrid(const double r, const double h);
 	void createFaceSplit(const Mesh &mesh, const uint div);
 
@@ -67,6 +68,11 @@ public:
 	void fillQuadFlags(const uint flag, const UintSet &oldflag = UINTSETALL);
 	void fillFlags(const uint flag, const UintSet &oldflag = UINTSETALL);
 	void fillBoundaryFlags(const uint flag, const UintSet &oldflag = UINTSETALL);
+	void fillNodeRectangleFlags(const Vector4 &minp, const Vector4 &maxp, const uint flag, const UintSet &oldflag = UINTSETALL);
+	void fillEdgeRectangleFlags(const Vector4 &minp, const Vector4 &maxp, const uint flag, const UintSet &oldflag = UINTSETALL);
+	void fillFaceRectangleFlags(const Vector4 &minp, const Vector4 &maxp, const uint flag, const UintSet &oldflag = UINTSETALL);
+	void fillBodyRectangleFlags(const Vector4 &minp, const Vector4 &maxp, const uint flag, const UintSet &oldflag = UINTSETALL);
+	void fillQuadRectangleFlags(const Vector4 &minp, const Vector4 &maxp, const uint flag, const UintSet &oldflag = UINTSETALL);
 	void fillRectangleFlags(const Vector4 &minp, const Vector4 &maxp, const uint flag, const UintSet &oldflag = UINTSETALL);
 	void expandFlags(const uint flag, const UintSet &oldflag = UINTSETALL, uint layers = uint(-1));
 	void removeByFlags(const UintSet &flag = UINTSETALL);
@@ -81,9 +87,10 @@ public:
 	bool repeatMiddle(const Vector4 &pos, const Vector4 &step, const uint steps) { return repeatMiddle(pos, step, step, steps); }
 	bool repeatMiddle(const Vector4 &pos, const Vector4 &dir, const Vector4 &step, const uint steps);
 
-	//
+	// hodge optimization
 	void improveNodeByHodge(const uint n, const bool position = true, const bool weight = true);
-	void optimizeMeshByHodge(const UintSet &flag = UINTSETALL, const uint iterations = 100, const bool position = true, const bool weight = true);
+	void optimizeNodes(const UintSet &flag = UINTSETALL, const uint iterations = 100, const bool position = true, const bool weight = true);
+	bool optimizeNodesIteration(const Buffer<uint> &n, const bool position = true, const bool weight = true);
 
 	// neighbors for advanced use only
 	void setNodeEdges(const uint n, const Buffer<uint> &e) { m_n[n].e = e; }
@@ -100,6 +107,7 @@ protected:
 	// stretch mesh
 	void stretch(const Buffer<uint> &n, const uint steps, const UintSet &flag, const uint flagMiddle, const uint flagEnd);
 	uint getIndex(uint i, uint num, const Buffer<uint> &ind, const Buffer<uint> &slot, const Buffer<uint> &link, const Buffer<uint> &s);
+	double getCellLengthSq(const uint i) const;
 
 };
 

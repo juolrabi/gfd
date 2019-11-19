@@ -21,13 +21,16 @@ void BlockIntegrator::clear() {
 void BlockIntegrator::init(const FormGrade grade, const PartMesh &mesh, const uint num) {
 	clear();
 	MeshIntegrator intg(mesh, grade, num);
-
 	m_dim = mesh.getDimension();
 	m_fields = intg.getFields();
 	m_values = intg.getLocals();
 	if(FormGradeIsDual(grade)) m_ext = intg.getExternals();
 	m_setter.resize(m_values + m_ext.size());
-	for(uint i=0; i<m_setter.size(); i++) intg.getSetter(i, m_setter[i]);
+	for(uint i=0; i<m_setter.size(); i++) {
+		uint setters = 0;
+		intg.gatherSetter(i, m_setter[i], setters);
+		m_setter[i].resize(setters);
+	}
 }
 
 void BlockIntegrator::initWedge(const FormGrade grade, const PartMesh &mesh, const uint num) {
@@ -39,7 +42,11 @@ void BlockIntegrator::initWedge(const FormGrade grade, const PartMesh &mesh, con
 	m_values = intg.getLocals();
 	m_ext = intg.getExternals();
 	m_setter.resize(m_values + m_ext.size());
-	for(uint i=0; i<m_setter.size(); i++) intg.getWedgeSetter(i, m_setter[i]);
+	for(uint i=0; i<m_setter.size(); i++) {
+		uint setters = 0;
+		intg.gatherWedgeSetter(i, m_setter[i], setters);
+		m_setter[i].resize(setters);
+	}
 }
 
 void BlockIntegrator::getVectors(double *result, const Buffer<double *> &exterm) const

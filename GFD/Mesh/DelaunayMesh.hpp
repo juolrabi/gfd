@@ -1,7 +1,8 @@
-/*
-DelaunayMesh includes insert and erase routines of nodes for convex weighted Delaunay mesh.
-The metric should be positive definite.
-*/
+/**
+ * DelaunayMesh includes insert and erase routines of nodes for convex weighted Delaunay mesh.
+ * The metric should be positive definite and constant through the domain.
+ * Author: Jukka Räbinä, University of Jyväskylä, 2019.
+ */
 
 #ifndef _DELAUNAYMESH_HPP_INCLUDED_
 #define _DELAUNAYMESH_HPP_INCLUDED_
@@ -21,7 +22,8 @@ public:
 	uint searchNode(const Vector4 &p, uint curr = 0) const; // returns the id of the node corresponding to the Voronoi-cell including p
 
 	// insert and erase weighted Delaunay nodes
-	uint insertNode(const Vector4 &p, double w = 0.0, uint near = 0, const bool forced = false);
+	uint insertNode(const Vector4 &p, const double w, uint near, const bool forced);
+	//uint insertNode(const Vector4 &p, double w = 0.0, const ushort s = 0, uint near = 0, const bool forced = false);
 	bool eraseNode(const uint n);
 
 	// insert Delaunay mesh

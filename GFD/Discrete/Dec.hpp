@@ -32,8 +32,9 @@ public:
 		Buffer<T> f(intg.getFields());
 		Buffer<double> q;
 		for(i=0; i<locs; i++) {
-			intg.getSetter(i, q);
-			sumIntegration(result.m_val[i], q, func, f);
+			uint qs = 0;
+			intg.gatherSetter(i, q, qs);
+			sumIntegration(q, qs, func, f, result.m_val[i]);
 		}
 		if(FormGradeIsPrim(grade)) return result;
 		// communicate with external terms
@@ -42,9 +43,10 @@ public:
 		const Buffer< pair<uint,uint> > &ext = intg.getExternals();
 		const Buffer< pair<uint,uint> > mext = getMyExternals(ext);
 		for(i=0; i<ext.size(); i++) {
+			uint qs = 0;
+			intg.gatherSetter(locs + i, q, qs);
 			val = result.m_zero;
-			intg.getSetter(locs + i, q);
-			sumIntegration(val, q, func, f);
+			sumIntegration(q, qs, func, f, val);
 			if(ext[i].first == rank) result.m_val[ext[i].second] += val;
 			else sendMPI(&val, sizeof(T), ext[i].first, 0);
 		}
@@ -54,21 +56,67 @@ public:
 		}
 		return result;
 	}
-	template<typename T> Sparse<T> &integrateHodge(const FormGrade grade, void func(const Vector4 &, T *), const uint num, Sparse<T> &result) const {
+	template<typename T> Diagonal<T> &integrateHodge(const FormGrade grade, void func(const Vector4 &, T *), const uint num, Diagonal<T> &result) const {
 		// initialize form
 		MeshIntegrator intg(m_mesh, grade, num);
 		const uint locs = intg.getLocals();
 		if(!result.m_full || result.m_height != locs) result.setFullOfZeros(locs);
 		if(num == 0) return result;
 
+		const uint rank = getMPIrank();
+		const Buffer< pair<uint,uint> > &ext = intg.getExternals();
+		const Buffer< pair<uint,uint> > mext = getMyExternals(ext);
+
+		// calculate vector squares
+		uint i, j;
+		const uint fields = intg.getFields();
+		uint vs = 0;
+		Buffer<double> v(locs * fields);
+		for(i=0; i<locs; i++) intg.gatherSetter0(i, v, vs);
+		if(FormGradeIsDual(grade)) {
+			Buffer<double> vi(fields);
+			for(i=0; i<ext.size(); i++) {
+				uint vis = 0;
+				intg.gatherSetter0(locs + i, vi, vis);
+				if(ext[i].first == rank) {
+					const uint ii = fields * ext[i].second;
+					for(j=0; j<fields; j++) v[ii + j] += vi[j];
+				}
+				else sendMPI(&vi[0], fields * sizeof(double), ext[i].first, 0);
+			}
+			for(i=0; i<mext.size(); i++) {
+				recvMPI(&vi[0], fields * sizeof(double), mext[i].first, 0);
+				const uint ii = fields * mext[i].second;
+				for(j=0; j<fields; j++) v[ii + j] += vi[j];
+			}
+		}
+		Buffer<double> sq(locs, 0.0);
+		for(i=0; i<vs; i++) sq[i / fields] += v[i] * v[i];
+		v.clear();
+
 		// integrate over mesh elements
-		uint i, j, k;
-		const uint dim = m_mesh.getDimension();
 		Buffer<T> f(intg.getWedgeFields());
 		Buffer<double> q;
+		T val;
 		for(i=0; i<locs; i++) {
-			intg.getWedgeSetter(i, q);
-			sumIntegration(result.m_val[i], q, func, f);
+			uint qs = 0;
+			intg.gatherWedgeSetter(i, q, qs);
+			val = result.m_zero;
+			sumIntegration(q, qs, func, f, val);
+			result.m_val[i] += val / sq[i];
+		}
+		// communicate with external terms
+		for(i=0; i<ext.size(); i++) {
+			uint qs = 0;
+			intg.gatherWedgeSetter(locs + i, q, qs);
+			val = result.m_zero;
+			sumIntegration(q, qs, func, f, val);
+			if(ext[i].first == rank) result.m_val[ext[i].second] += val / sq[ext[i].second];
+			else sendMPI(&val, sizeof(T), ext[i].first, 0);
+		}
+		for(i=0; i<mext.size(); i++) {
+			recvMPI(&val, sizeof(T), mext[i].first, 0);
+			result.m_val[mext[i].second] += val / sq[mext[i].second];
 		}
 		return result;
 	}
@@ -76,10 +124,10 @@ public:
 protected:
 	const PartMesh &m_mesh;
 
-	template<typename T> void sumIntegration(T &val, const Buffer<double> &q, void func(const Vector4 &, T *), Buffer<T> &f) const {
+	template<typename T> void sumIntegration(const Buffer<double> &q, const uint qs, void func(const Vector4 &, T *), Buffer<T> &f, T &val) const {
 		uint i, j;
 		const uint dim = m_mesh.getDimension();
-		for(i=f.size(); i<q.size(); ) {
+		for(i=f.size(); i<qs; ) {
 			const double fac = q[i++];
 			Vector4 p(q[i++],0,0,0);
 			if(dim >= 2) p.y = q[i++];
@@ -89,7 +137,6 @@ protected:
 			for(j=0; j<f.size(); j++) val += fac * q[j] * f[j];
 		}
 	}
-
 	Buffer< pair<uint,uint> > getMyExternals(const Buffer< pair<uint,uint> > &ext) const;
 
 };
