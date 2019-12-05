@@ -2473,6 +2473,77 @@ Buffer<Vector4> &Mesh::getQuadSimplices(const uint q, Buffer<Vector4> &p) const 
 	p.resize(ps);
 	return p;
 }
+Buffer<Vector4> &Mesh::getNodeEdgeSimplices(const uint n, Buffer<uint> &e, Buffer<Vector4> &p) const {
+	e = getNodeEdges(n);
+	p.resize(2 * e.size());
+	const Vector4 np = getNodePosition(n);
+	for(uint i=0; i<e.size(); i++) {
+		const uint spot = (getEdgeIncidence(e[i], n) < 0 ? 0 : 1);
+		p[2 * i + spot] = np;
+		p[2 * i + 1 - spot] = getEdgePosition(e[i]);
+	}
+	return p;
+}
+Buffer<Vector4> &Mesh::getNodeFaceSimplices(const uint n, Buffer<uint> &f, Buffer<Vector4> &p) const {
+	uint fs = 0;
+	uint ps = 0;
+	const Vector4 np = getNodePosition(n);
+	const Buffer<uint> &e = getNodeEdges(n);
+	for(uint i=0; i<e.size(); i++) {
+		Buffer<uint> ef;
+		Buffer<Vector4> ep;
+		getEdgeFaceSimplices(e[i], ef, ep);
+		for(uint j=0; j<ef.size(); j++) f.gather(ef[j], fs);
+		const uint spot = (getEdgeIncidence(e[i], n) < 0 ? 0 : 1);
+		for(uint j=0; j<ep.size(); j++) {
+			if((j % 2) == spot) p.gather(np, ps);
+			p.gather(ep[j], ps);
+		}
+	}
+	f.resize(fs);
+	p.resize(ps);
+	return p;
+}
+Buffer<Vector4> &Mesh::getNodeBodySimplices(const uint n, Buffer<uint> &b, Buffer<Vector4> &p) const {
+	uint bs = 0;
+	uint ps = 0;
+	const Vector4 np = getNodePosition(n);
+	const Buffer<uint> &e = getNodeEdges(n);
+	for(uint i=0; i<e.size(); i++) {
+		Buffer<uint> eb;
+		Buffer<Vector4> ep;
+		getEdgeBodySimplices(e[i], eb, ep);
+		for(uint j=0; j<eb.size(); j++) b.gather(eb[j], bs);
+		const uint spot = (getEdgeIncidence(e[i], n) < 0 ? 0 : 1);
+		for(uint j=0; j<ep.size(); j++) {
+			if((j % 3) == spot) p.gather(np, ps);
+			p.gather(ep[j], ps);
+		}
+	}
+	b.resize(bs);
+	p.resize(ps);
+	return p;
+}
+Buffer<Vector4> &Mesh::getNodeQuadSimplices(const uint n, Buffer<uint> &q, Buffer<Vector4> &p) const {
+	uint qs = 0;
+	uint ps = 0;
+	const Vector4 np = getNodePosition(n);
+	const Buffer<uint> &e = getNodeEdges(n);
+	for(uint i=0; i<e.size(); i++) {
+		Buffer<uint> eq;
+		Buffer<Vector4> ep;
+		getEdgeQuadSimplices(e[i], eq, ep);
+		for(uint j=0; j<eq.size(); j++) q.gather(eq[j], qs);
+		const uint spot = (getEdgeIncidence(e[i], n) < 0 ? 0 : 1);
+		for(uint j=0; j<ep.size(); j++) {
+			if((j % 4) == spot) p.gather(np, ps);
+			p.gather(ep[j], ps);
+		}
+	}
+	q.resize(qs);
+	p.resize(ps);
+	return p;
+}
 Buffer<Vector4> &Mesh::getEdgeNodeSimplices(const uint e, Buffer<uint> &n, Buffer<Vector4> &p) const {
 	const Vector4 ep = getEdgePosition(e);
 	n = getEdgeNodes(e);
@@ -2481,6 +2552,57 @@ Buffer<Vector4> &Mesh::getEdgeNodeSimplices(const uint e, Buffer<uint> &n, Buffe
 	p[1] = ep;
 	p[2] = ep;
 	p[3] = getNodePosition(n[1]);
+	return p;
+}
+Buffer<Vector4> &Mesh::getEdgeFaceSimplices(const uint e, Buffer<uint> &f, Buffer<Vector4> &p) const {
+	f = getEdgeFaces(e);
+	p.resize(2 * f.size());
+	const Vector4 ep = getEdgePosition(e);
+	for(uint i=0; i<f.size(); i++) {
+		const uint spot = (getFaceIncidence(f[i], e) > 0 ? 0 : 1);
+		p[2 * i + spot] = ep;
+		p[2 * i + 1 - spot] = getFacePosition(f[i]);
+	}
+	return p;
+}
+Buffer<Vector4> &Mesh::getEdgeBodySimplices(const uint e, Buffer<uint> &b, Buffer<Vector4> &p) const {
+	uint bs = 0;
+	uint ps = 0;
+	const Vector4 ep = getEdgePosition(e);
+	const Buffer<uint> &f = getEdgeFaces(e);
+	for(uint i=0; i<f.size(); i++) {
+		Buffer<uint> fb;
+		Buffer<Vector4> fp;
+		getFaceBodySimplices(f[i], fb, fp);
+		for(uint j=0; j<fb.size(); j++) b.gather(fb[j], bs);
+		const uint spot = (getFaceIncidence(f[i], e) > 0 ? 0 : 1);
+		for(uint j=0; j<fp.size(); j++) {
+			if((j % 2) == spot) p.gather(ep, ps);
+			p.gather(fp[j], ps);
+		}
+	}
+	b.resize(bs);
+	p.resize(ps);
+	return p;
+}
+Buffer<Vector4> &Mesh::getEdgeQuadSimplices(const uint e, Buffer<uint> &q, Buffer<Vector4> &p) const {
+	uint qs = 0;
+	uint ps = 0;
+	const Vector4 ep = getEdgePosition(e);
+	const Buffer<uint> &f = getEdgeFaces(e);
+	for(uint i=0; i<f.size(); i++) {
+		Buffer<uint> fq;
+		Buffer<Vector4> fp;
+		getFaceQuadSimplices(f[i], fq, fp);
+		for(uint j=0; j<fq.size(); j++) q.gather(fq[j], qs);
+		const uint spot = (getFaceIncidence(f[i], e) > 0 ? 0 : 1);
+		for(uint j=0; j<fp.size(); j++) {
+			if((j % 3) == spot) p.gather(ep, ps);
+			p.gather(fp[j], ps);
+		}
+	}
+	q.resize(qs);
+	p.resize(ps);
 	return p;
 }
 Buffer<Vector4> &Mesh::getFaceNodeSimplices(const uint f, Buffer<uint> &n, Buffer<Vector4> &p) const {
@@ -2514,6 +2636,37 @@ Buffer<Vector4> &Mesh::getFaceEdgeSimplices(const uint f, Buffer<uint> &e, Buffe
 		p[2 * i + spot] = fp;
 		p[2 * i + 1 - spot] = getEdgePosition(e[i]);
 	}
+	return p;
+}
+Buffer<Vector4> &Mesh::getFaceBodySimplices(const uint f, Buffer<uint> &b, Buffer<Vector4> &p) const {
+	b = getFaceBodies(f);
+	p.resize(2 * b.size());
+	const Vector4 fp = getFacePosition(f);
+	for(uint i=0; i<b.size(); i++) {
+		const uint spot = (getBodyIncidence(b[i], f) < 0 ? 0 : 1);
+		p[2 * i + spot] = fp;
+		p[2 * i + 1 - spot] = getBodyPosition(b[i]);
+	}
+	return p;
+}
+Buffer<Vector4> &Mesh::getFaceQuadSimplices(const uint f, Buffer<uint> &q, Buffer<Vector4> &p) const {
+	uint qs = 0;
+	uint ps = 0;
+	const Vector4 fp = getFacePosition(f);
+	const Buffer<uint> &b = getFaceBodies(f);
+	for(uint i=0; i<b.size(); i++) {
+		Buffer<uint> bq;
+		Buffer<Vector4> bp;
+		getBodyQuadSimplices(b[i], bq, bp);
+		for(uint j=0; j<bq.size(); j++) q.gather(bq[j], qs);
+		const uint spot = (getBodyIncidence(b[i], f) < 0 ? 0 : 1);
+		for(uint j=0; j<bp.size(); j++) {
+			if((j % 2) == spot) p.gather(fp, ps);
+			p.gather(bp[j], ps);
+		}
+	}
+	q.resize(qs);
+	p.resize(ps);
 	return p;
 }
 Buffer<Vector4> &Mesh::getBodyNodeSimplices(const uint b, Buffer<uint> &n, Buffer<Vector4> &p) const {
@@ -2564,6 +2717,17 @@ Buffer<Vector4> &Mesh::getBodyFaceSimplices(const uint b, Buffer<uint> &f, Buffe
 		const uint spot = (getBodyIncidence(b, f[i]) > 0 ? 0 : 1);
 		p[2 * i + spot] = bp;
 		p[2 * i + 1 - spot] = getFacePosition(f[i]);
+	}
+	return p;
+}
+Buffer<Vector4> &Mesh::getBodyQuadSimplices(const uint b, Buffer<uint> &q, Buffer<Vector4> &p) const {
+	q = getBodyQuads(b);
+	p.resize(2 * q.size());
+	const Vector4 bp = getBodyPosition(b);
+	for(uint i=0; i<q.size(); i++) {
+		const uint spot = (getQuadIncidence(q[i], b) < 0 ? 0 : 1);
+		p[2 * i + spot] = bp;
+		p[2 * i + 1 - spot] = getQuadPosition(q[i]);
 	}
 	return p;
 }
@@ -2638,6 +2802,356 @@ Buffer<Vector4> &Mesh::getQuadBodySimplices(const uint q, Buffer<uint> &b, Buffe
 	}
 	return p;
 }
+
+Vector4 Mesh::getNodeEdgeVectors(const uint n, Buffer<uint> &e, Buffer<Vector4> &v) const {
+	e = getNodeEdges(n);
+	v.resize(e.size());
+	const Vector4 np = getNodePosition(n);
+	for(uint i=0; i<e.size(); i++) {
+		const Vector4 ep = getEdgePosition(e[i]);
+		v[i] = (getEdgeIncidence(e[i], n) < 0 ? ep - np : np - ep);
+	}
+	return np;
+}
+Vector4 Mesh::getNodeFaceVectors(const uint n, Buffer<uint> &f, Buffer<TwoVector4> &v) const {
+	uint fs = 0;
+	uint vs = 0;
+	const Vector4 np = getNodePosition(n);
+	const Buffer<uint> &e = getNodeEdges(n);
+	for(uint i=0; i<e.size(); i++) {
+		Buffer<uint> ef;
+		Buffer<Vector4> ev;
+		const Vector4 ep = getEdgeFaceVectors(e[i], ef, ev);
+		const Vector4 vi = (getEdgeIncidence(e[i], n) < 0 ? ep - np : np - ep) / 2.0;
+		for(uint j=0; j<ef.size(); j++) {
+			const uint l = f.findFirst(ef[j], fs);
+			if(l < fs) v[l] += TwoVector4(vi, ev[j]);
+			else {
+				f.gather(ef[j], fs);
+				v.gather(TwoVector4(vi, ev[j]), vs);
+			}
+		}
+	}
+	f.resize(fs);
+	v.resize(vs);
+	return np;
+}
+Vector4 Mesh::getNodeBodyVectors(const uint n, Buffer<uint> &b, Buffer<ThreeVector4> &v) const {
+	uint bs = 0;
+	uint vs = 0;
+	const Vector4 np = getNodePosition(n);
+	const Buffer<uint> &e = getNodeEdges(n);
+	for(uint i=0; i<e.size(); i++) {
+		Buffer<uint> eb;
+		Buffer<TwoVector4> ev;
+		const Vector4 ep = getEdgeBodyVectors(e[i], eb, ev);
+		const Vector4 vi = (getEdgeIncidence(e[i], n) < 0 ? ep - np : np - ep) / 3.0;
+		for(uint j=0; j<eb.size(); j++) {
+			const uint l = b.findFirst(eb[j], bs);
+			if(l < bs) v[l] += ThreeVector4(vi, ev[j]);
+			else {
+				b.gather(eb[j], bs);
+				v.gather(ThreeVector4(vi, ev[j]), vs);
+			}
+		}
+	}
+	b.resize(bs);
+	v.resize(vs);
+	return np;
+}
+Vector4 Mesh::getNodeQuadVectors(const uint n, Buffer<uint> &q, Buffer<FourVector4> &v) const {
+	uint qs = 0;
+	uint vs = 0;
+	const Vector4 np = getNodePosition(n);
+	const Buffer<uint> &e = getNodeEdges(n);
+	for(uint i=0; i<e.size(); i++) {
+		Buffer<uint> eq;
+		Buffer<ThreeVector4> ev;
+		const Vector4 ep = getEdgeQuadVectors(e[i], eq, ev);
+		const Vector4 vi = (getEdgeIncidence(e[i], n) < 0 ? ep - np : np - ep) / 4.0;
+		for(uint j=0; j<eq.size(); j++) {
+			const uint l = q.findFirst(eq[j], qs);
+			if(l < qs) v[l] += FourVector4(vi, ev[j]);
+			else {
+				q.gather(eq[j], qs);
+				v.gather(FourVector4(vi, ev[j]), vs);
+			}
+		}
+	}
+	q.resize(qs);
+	v.resize(vs);
+	return np;
+}
+Vector4 Mesh::getEdgeNodeVectors(const uint e, Buffer<uint> &n, Buffer<Vector4> &v) const {
+	const Vector4 ep = getEdgePosition(e);
+	n = getEdgeNodes(e);
+	v.resize(2);
+	v[0] = ep - getNodePosition(n[0]);
+	v[1] = getNodePosition(n[1]) - ep;
+	return ep;
+}
+Vector4 Mesh::getEdgeFaceVectors(const uint e, Buffer<uint> &f, Buffer<Vector4> &v) const {
+	f = getEdgeFaces(e);
+	v.resize(f.size());
+	const Vector4 ep = getEdgePosition(e);
+	for(uint i=0; i<f.size(); i++) {
+		const Vector4 fp = getFacePosition(f[i]);
+		v[i] = (getFaceIncidence(f[i], e) > 0 ? fp - ep : ep - fp);
+	}
+	return ep;
+}
+Vector4 Mesh::getEdgeBodyVectors(const uint e, Buffer<uint> &b, Buffer<TwoVector4> &v) const {
+	uint bs = 0;
+	uint vs = 0;
+	const Vector4 ep = getEdgePosition(e);
+	const Buffer<uint> &f = getEdgeFaces(e);
+	for(uint i=0; i<f.size(); i++) {
+		Buffer<uint> fb;
+		Buffer<Vector4> fv;
+		const Vector4 fp = getFaceBodyVectors(f[i], fb, fv);
+		const Vector4 vi = (getFaceIncidence(f[i], e) > 0 ? fp - ep : ep - fp) / 2.0;
+		for(uint j=0; j<fb.size(); j++) {
+			const uint l = b.findFirst(fb[j], bs);
+			if(l < bs) v[l] += TwoVector4(vi, fv[j]);
+			else {
+				b.gather(fb[j], bs);
+				v.gather(TwoVector4(vi, fv[j]), vs);
+			}
+		}
+	}
+	b.resize(bs);
+	v.resize(vs);
+	return ep;
+}
+Vector4 Mesh::getEdgeQuadVectors(const uint e, Buffer<uint> &q, Buffer<ThreeVector4> &v) const {
+	uint qs = 0;
+	uint vs = 0;
+	const Vector4 ep = getEdgePosition(e);
+	const Buffer<uint> &f = getEdgeFaces(e);
+	for(uint i=0; i<f.size(); i++) {
+		Buffer<uint> fq;
+		Buffer<TwoVector4> fv;
+		const Vector4 fp = getFaceQuadVectors(f[i], fq, fv);
+		const Vector4 vi = (getFaceIncidence(f[i], e) > 0 ? fp - ep : ep - fp) / 3.0;
+		for(uint j=0; j<fq.size(); j++) {
+			const uint l = q.findFirst(fq[j], qs);
+			if(l < qs) v[l] += ThreeVector4(vi, fv[j]);
+			else {
+				q.gather(fq[j], qs);
+				v.gather(ThreeVector4(vi, fv[j]), vs);
+			}
+		}
+	}
+	q.resize(qs);
+	v.resize(vs);
+	return ep;
+}
+Vector4 Mesh::getFaceNodeVectors(const uint f, Buffer<uint> &n, Buffer<TwoVector4> &v) const {
+	const Buffer<uint> &e = getFaceEdges(f);
+	const Vector4 fp = getFacePosition(f);
+	n.resize(e.size());
+	v.resize(e.size());
+	uint j = e.size() - 1;
+	Vector4 jp = getEdgePosition(e[j]);
+	for(uint i=0; i<e.size(); i++) {
+		const Vector4 ep = getEdgePosition(e[i]);
+		n[i] = getEdgeIntersection(e[i], e[j]);
+		v[i] = TwoVector4(0.5 * (jp - ep), getNodePosition(n[i]) - fp);
+		jp = ep;
+		j = i;
+	}
+	return fp;
+}
+Vector4 Mesh::getFaceEdgeVectors(const uint f, Buffer<uint> &e, Buffer<Vector4> &v) const {
+	e = getFaceEdges(f);
+	v.resize(e.size());
+	const Vector4 fp = getFacePosition(f);
+	for(uint i=0; i<e.size(); i++) {
+		const Vector4 ep = getEdgePosition(e[i]);
+		v[i] = (getFaceIncidence(f, e[i]) < 0 ? ep - fp : fp - ep);
+	}
+	return fp;
+}
+Vector4 Mesh::getFaceBodyVectors(const uint f, Buffer<uint> &b, Buffer<Vector4> &v) const {
+	b = getFaceBodies(f);
+	v.resize(b.size());
+	const Vector4 fp = getFacePosition(f);
+	for(uint i=0; i<b.size(); i++) {
+		const Vector4 bp = getBodyPosition(b[i]);
+		v[i] = (getBodyIncidence(b[i], f) < 0 ? bp - fp : fp - bp);
+	}
+	return fp;
+}
+Vector4 Mesh::getFaceQuadVectors(const uint f, Buffer<uint> &q, Buffer<TwoVector4> &v) const {
+	uint qs = 0;
+	uint vs = 0;
+	const Vector4 fp = getFacePosition(f);
+	const Buffer<uint> &b = getFaceBodies(f);
+	for(uint i=0; i<b.size(); i++) {
+		Buffer<uint> bq;
+		Buffer<Vector4> bv;
+		const Vector4 bp = getBodyQuadVectors(b[i], bq, bv);
+		const Vector4 vi = (getBodyIncidence(b[i], f) < 0 ? bp - fp : fp - bp) / 2.0;
+		for(uint j=0; j<bq.size(); j++) {
+			const uint l = q.findFirst(bq[j], qs);
+			if(l < qs) v[l] += TwoVector4(vi, bv[j]);
+			else {
+				q.gather(bq[j], qs);
+				v.gather(TwoVector4(vi, bv[j]), vs);
+			}
+		}
+	}
+	q.resize(qs);
+	v.resize(vs);
+	return fp;
+}
+Vector4 Mesh::getBodyNodeVectors(const uint b, Buffer<uint> &n, Buffer<ThreeVector4> &v) const {
+	uint ns = 0;
+	uint vs = 0;
+	const Vector4 bp = getBodyPosition(b);
+	const Buffer<uint> &f = getBodyFaces(b);
+	for(uint i=0; i<f.size(); i++) {
+		Buffer<uint> fn;
+		Buffer<TwoVector4> fv;
+		const Vector4 fp = getFaceNodeVectors(f[i], fn, fv);
+		const Vector4 vi = (getBodyIncidence(b, f[i]) > 0 ? fp - bp : bp - fp) / 3.0;
+		for(uint j=0; j<fn.size(); j++) {
+			const uint l = n.findFirst(fn[j], ns);
+			if(l < ns) v[l] += ThreeVector4(vi, fv[j]);
+			else {
+				n.gather(fn[j], ns);
+				v.gather(ThreeVector4(vi, fv[j]), vs);
+			}
+		}
+	}
+	n.resize(ns);
+	v.resize(vs);
+	return bp;
+}
+Vector4 Mesh::getBodyEdgeVectors(const uint b, Buffer<uint> &e, Buffer<TwoVector4> &v) const {
+	uint es = 0;
+	uint vs = 0;
+	const Vector4 bp = getBodyPosition(b);
+	const Buffer<uint> &f = getBodyFaces(b);
+	for(uint i=0; i<f.size(); i++) {
+		Buffer<uint> fe;
+		Buffer<Vector4> fv;
+		const Vector4 fp = getFaceEdgeVectors(f[i], fe, fv);
+		const Vector4 vi = (getBodyIncidence(b, f[i]) < 0 ? fp - bp : bp - fp) / 2.0;
+		for(uint j=0; j<fe.size(); j++) {
+			const uint l = e.findFirst(fe[j], es);
+			if(l < es) v[l] += TwoVector4(vi, fv[j]);
+			else {
+				e.gather(fe[j], es);
+				v.gather(TwoVector4(vi, fv[j]), vs);
+			}
+		}
+	}
+	e.resize(es);
+	v.resize(vs);
+	return bp;
+}
+Vector4 Mesh::getBodyFaceVectors(const uint b, Buffer<uint> &f, Buffer<Vector4> &v) const {
+	f = getBodyFaces(b);
+	v.resize(f.size());
+	const Vector4 bp = getBodyPosition(b);
+	for(uint i=0; i<f.size(); i++) {
+		const Vector4 fp = getFacePosition(f[i]);
+		v[i] = (getBodyIncidence(b, f[i]) > 0 ? fp - bp : bp - fp);
+	}
+	return bp;
+}
+Vector4 Mesh::getBodyQuadVectors(const uint b, Buffer<uint> &q, Buffer<Vector4> &v) const {
+	q = getBodyQuads(b);
+	v.resize(q.size());
+	const Vector4 bp = getBodyPosition(b);
+	for(uint i=0; i<q.size(); i++) {
+		const Vector4 qp = getQuadPosition(q[i]);
+		v[i] = (getQuadIncidence(q[i], b) < 0 ? qp - bp : bp - qp);
+	}
+	return bp;
+}
+Vector4 Mesh::getQuadNodeVectors(const uint q, Buffer<uint> &n, Buffer<FourVector4> &v) const {
+	uint ns = 0;
+	uint vs = 0;
+	const Vector4 qp = getQuadPosition(q);
+	const Buffer<uint> &b = getQuadBodies(q);
+	for(uint i=0; i<b.size(); i++) {
+		Buffer<uint> bn;
+		Buffer<ThreeVector4> bv;
+		getBodyNodeVectors(b[i], bn, bv);
+		const Vector4 bp = getBodyNodeVectors(b[i], bn, bv);
+		const Vector4 vi = (getQuadIncidence(q, b[i]) < 0 ? bp - qp : qp - bp) / 4.0;
+		for(uint j=0; j<bn.size(); j++) {
+			const uint l = n.findFirst(bn[j], ns);
+			if(l < ns) v[l] += FourVector4(vi, bv[j]);
+			else {
+				n.gather(bn[j], ns);
+				v.gather(FourVector4(vi, bv[j]), vs);
+			}
+		}
+	}
+	n.resize(ns);
+	v.resize(vs);
+	return qp;
+}
+Vector4 Mesh::getQuadEdgeVectors(const uint q, Buffer<uint> &e, Buffer<ThreeVector4> &v) const {
+	uint es = 0;
+	uint vs = 0;
+	const Vector4 qp = getQuadPosition(q);
+	const Buffer<uint> &b = getQuadBodies(q);
+	for(uint i=0; i<b.size(); i++) {
+		Buffer<uint> be;
+		Buffer<TwoVector4> bv;
+		const Vector4 bp = getBodyEdgeVectors(b[i], be, bv);
+		const Vector4 vi = (getQuadIncidence(q, b[i]) > 0 ? bp - qp : qp - bp) / 3.0;
+		for(uint j=0; j<be.size(); j++) {
+			const uint l = e.findFirst(be[j], es);
+			if(l < es) v[l] += ThreeVector4(vi, bv[j]);
+			else {
+				e.gather(be[j], es);
+				v.gather(ThreeVector4(vi, bv[j]), vs);
+			}
+		}
+	}
+	e.resize(es);
+	v.resize(vs);
+	return qp;
+}
+Vector4 Mesh::getQuadFaceVectors(const uint q, Buffer<uint> &f, Buffer<TwoVector4> &v) const {
+	uint fs = 0;
+	uint vs = 0;
+	const Vector4 qp = getQuadPosition(q);
+	const Buffer<uint> &b = getQuadBodies(q);
+	for(uint i=0; i<b.size(); i++) {
+		Buffer<uint> bf;
+		Buffer<Vector4> bv;
+		const Vector4 bp = getBodyFaceVectors(b[i], bf, bv);
+		const Vector4 vi = 0.5 * (getQuadIncidence(q, b[i]) < 0 ? bp - qp : qp - bp);
+		for(uint j=0; j<bf.size(); j++) {
+			const uint l = f.findFirst(bf[j], fs);
+			if(l < fs) v[l] += TwoVector4(vi, bv[j]);
+			else {
+				f.gather(bf[j], fs);
+				v.gather(TwoVector4(vi, bv[j]), vs);
+			}
+		}
+	}
+	f.resize(fs);
+	v.resize(vs);
+	return qp;
+}
+Vector4 Mesh::getQuadBodyVectors(const uint q, Buffer<uint> &b, Buffer<Vector4> &v) const {
+	b = getQuadBodies(q);
+	v.resize(b.size());
+	const Vector4 qp = getQuadPosition(q);
+	for(uint i=0; i<b.size(); i++) {
+		const Vector4 bp = getBodyPosition(b[i]);
+		v[i] = (getQuadIncidence(q, b[i]) > 0 ? bp - qp : qp - bp);
+	}
+	return qp;
+}
+
 
 void Mesh::gatherNodeSimplices(const uint n, Buffer<Vector4> &p, uint &ps, Buffer<double> &v, uint &vs) const {
 	p.gather(getNodePosition(n), ps);

@@ -20,7 +20,7 @@ void BlockIntegrator::clear() {
 
 void BlockIntegrator::init(const FormGrade grade, const PartMesh &mesh, const uint num) {
 	clear();
-	MeshIntegrator intg(mesh, grade, num);
+	MeshIntegrator intg(mesh, grade, num, 0, mesh.getDimension());
 	m_dim = mesh.getDimension();
 	m_fields = intg.getFields();
 	m_values = intg.getLocals();
@@ -35,7 +35,7 @@ void BlockIntegrator::init(const FormGrade grade, const PartMesh &mesh, const ui
 
 void BlockIntegrator::initWedge(const FormGrade grade, const PartMesh &mesh, const uint num) {
 	clear();
-	MeshIntegrator intg(mesh, grade, num);
+	MeshIntegrator intg(mesh, grade, num, 0, mesh.getDimension());
 
 	m_dim = mesh.getDimension();
 	m_fields = intg.getWedgeFields();

@@ -69,7 +69,17 @@ int main() {
 
 	Buffer<FourVector4> nd(mesh.getNodeSize(), FourVector4(0));
 	if(mesh.getFaceSize() == 0) { 
-		for(i=0; i<mesh.getEdgeSize(); i++) {
+		for(i=0; i<nd.size(); i++) {
+			Buffer<uint> s;
+			Buffer<Vector4> p;
+			mesh.getNodeEdgeSimplices(i, s, p);
+			for(j=0; j<s.size(); j++) {
+				const Vector4 *pj = &p[2 * j];
+				const ThreeVector4 dv = mesh.getEdgeVector(s[j]).unit().dual();
+				nd[i] += FourVector4(pj[1] - pj[0], dv);
+			}
+		}
+/*		for(i=0; i<mesh.getEdgeSize(); i++) {
 			Buffer<uint> s;
 			Buffer<Vector4> p;
 			mesh.getEdgeNodeSimplices(i, s, p);
@@ -79,9 +89,19 @@ int main() {
 				nd[s[j]] += FourVector4(pj[1] - pj[0], dv);
 			}
 		}
-	}
+*/	}
 	else if(mesh.getBodySize() == 0) {
-		for(i=0; i<mesh.getFaceSize(); i++) {
+		for(i=0; i<nd.size(); i++) {
+			Buffer<uint> s;
+			Buffer<Vector4> p;
+			mesh.getNodeFaceSimplices(i, s, p);
+			for(j=0; j<s.size(); j++) {
+				const Vector4 *pj = &p[3 * j];
+				const TwoVector4 dv = mesh.getFaceVector(s[j]).unit().dual() / 2.0;
+				nd[i] += FourVector4(pj[1] - pj[0], pj[2] - pj[0], dv);
+			}
+		}
+/*		for(i=0; i<mesh.getFaceSize(); i++) {
 			Buffer<uint> s;
 			Buffer<Vector4> p;
 			mesh.getFaceNodeSimplices(i, s, p);
@@ -91,9 +111,19 @@ int main() {
 				nd[s[j]] += FourVector4(pj[1] - pj[0], pj[2] - pj[0], dv);
 			}
 		}
-	}
+*/	}
 	else if(mesh.getQuadSize() == 0) {
-		for(i=0; i<mesh.getBodySize(); i++) {
+		for(i=0; i<nd.size(); i++) {
+			Buffer<uint> s;
+			Buffer<Vector4> p;
+			mesh.getNodeBodySimplices(i, s, p);
+			for(j=0; j<s.size(); j++) {
+				const Vector4 *pj = &p[4 * j];
+				const Vector4 dv = mesh.getBodyVector(s[j]).unit().dual() / 6.0;
+				nd[i] += FourVector4(pj[1] - pj[0], pj[2] - pj[0], pj[3] - pj[0], dv);
+			}
+		}
+/*		for(i=0; i<mesh.getBodySize(); i++) {
 			Buffer<uint> s;
 			Buffer<Vector4> p;
 			mesh.getBodyNodeSimplices(i, s, p);
@@ -103,9 +133,19 @@ int main() {
 				nd[s[j]] += FourVector4(pj[1] - pj[0], pj[2] - pj[0], pj[3] - pj[0], dv);
 			}
 		}
-	}
+*/	}
 	else {
-		for(i=0; i<mesh.getQuadSize(); i++) {
+		for(i=0; i<nd.size(); i++) {
+			Buffer<uint> s;
+			Buffer<Vector4> p;
+			mesh.getNodeQuadSimplices(i, s, p);
+			for(j=0; j<s.size(); j++) {
+				const Vector4 *pj = &p[5 * j];
+				const double dv = mesh.getQuadVector(s[j]).unit().dual() / 24.0;
+				nd[i] += FourVector4(pj[1] - pj[0], pj[2] - pj[0], pj[3] - pj[0], pj[4] - pj[0]) * dv;
+			}
+		}
+/*		for(i=0; i<mesh.getQuadSize(); i++) {
 			Buffer<uint> s;
 			Buffer<Vector4> p;
 			mesh.getQuadNodeSimplices(i, s, p);
@@ -115,10 +155,10 @@ int main() {
 				nd[s[j]] += FourVector4(pj[1] - pj[0], pj[2] - pj[0], pj[3] - pj[0], pj[4] - pj[0]) * dv;
 			}
 		}
-	}
+*/	}
 	for(i=0; i<nd.size(); i++) {
 		const double diff = (mesh.getNodeDualVector(i) - nd[i]).len();
-		if(fabs(diff) > 1e-12) cout << "Node dual " << diff << " " << diff / nd[i].len() << endl;
+		if(fabs(diff) > 1e-12) cout << "Node dual " << diff << " " << nd[i].len() << endl;
 		else cout << "Node jee" << endl;
 	}
 
@@ -129,7 +169,17 @@ int main() {
 		}
 	}
 	else if(mesh.getBodySize() == 0) {
-		for(i=0; i<mesh.getFaceSize(); i++) {
+		for(i=0; i<ed.size(); i++) {
+			Buffer<uint> s;
+			Buffer<Vector4> p;
+			mesh.getEdgeFaceSimplices(i, s, p);
+			for(j=0; j<s.size(); j++) {
+				const Vector4 *pj = &p[2 * j];
+				const TwoVector4 dv = mesh.getFaceVector(s[j]).unit().dual();
+				ed[i] += ThreeVector4(pj[1] - pj[0], dv);
+			}
+		}
+/*		for(i=0; i<mesh.getFaceSize(); i++) {
 			Buffer<uint> s;
 			Buffer<Vector4> p;
 			mesh.getFaceEdgeSimplices(i, s, p);
@@ -139,9 +189,19 @@ int main() {
 				ed[s[j]] += ThreeVector4(pj[1] - pj[0], dv);
 			}
 		}
-	}
+*/	}
 	else if(mesh.getQuadSize() == 0) {
-		for(i=0; i<mesh.getBodySize(); i++) {
+		for(i=0; i<ed.size(); i++) {
+			Buffer<uint> s;
+			Buffer<Vector4> p;
+			mesh.getEdgeBodySimplices(i, s, p);
+			for(j=0; j<s.size(); j++) {
+				const Vector4 *pj = &p[3 * j];
+				const Vector4 dv = mesh.getBodyVector(s[j]).unit().dual() / 2.0;
+				ed[i] += ThreeVector4(pj[1] - pj[0], pj[2] - pj[0], dv);
+			}
+		}
+/*		for(i=0; i<mesh.getBodySize(); i++) {
 			Buffer<uint> s;
 			Buffer<Vector4> p;
 			mesh.getBodyEdgeSimplices(i, s, p);
@@ -151,9 +211,19 @@ int main() {
 				ed[s[j]] += ThreeVector4(pj[1] - pj[0], pj[2] - pj[0], dv);
 			}
 		}
-	}
+*/	}
 	else {
-		for(i=0; i<mesh.getQuadSize(); i++) {
+		for(i=0; i<ed.size(); i++) {
+			Buffer<uint> s;
+			Buffer<Vector4> p;
+			mesh.getEdgeQuadSimplices(i, s, p);
+			for(j=0; j<s.size(); j++) {
+				const Vector4 *pj = &p[4 * j];
+				const double dv = mesh.getQuadVector(s[j]).unit().dual() / 6.0;
+				ed[i] += ThreeVector4(pj[1] - pj[0], pj[2] - pj[0], pj[3] - pj[0]) * dv;
+			}
+		}
+/*		for(i=0; i<mesh.getQuadSize(); i++) {
 			Buffer<uint> s;
 			Buffer<Vector4> p;
 			mesh.getQuadEdgeSimplices(i, s, p);
@@ -163,7 +233,7 @@ int main() {
 				ed[s[j]] += ThreeVector4(pj[1] - pj[0], pj[2] - pj[0], pj[3] - pj[0]) * dv;
 			}
 		}
-	}
+*/	}
 	for(i=0; i<ed.size(); i++) {
 		const double diff = (mesh.getEdgeDualVector(i) - ed[i]).len();
 		if(fabs(diff) > 1e-12) cout << "Edge dual " << diff << " " << ed[i].len() << endl;
@@ -177,7 +247,18 @@ int main() {
 		}
 	}
 	else if(mesh.getQuadSize() == 0) {
-		for(i=0; i<mesh.getBodySize(); i++) {
+		for(i=0; i<fd.size(); i++) {
+			Buffer<uint> s;
+			Buffer<Vector4> p;
+			mesh.getFaceBodySimplices(i, s, p);
+			for(j=0; j<s.size(); j++) {
+				const Vector4 *pj = &p[2 * j];
+				const Vector4 dv = mesh.getBodyVector(s[j]).unit().dual();
+				fd[i] += TwoVector4(pj[1] - pj[0], dv);
+			}
+		}
+
+/*		for(i=0; i<mesh.getBodySize(); i++) {
 			Buffer<uint> s;
 			Buffer<Vector4> p;
 			mesh.getBodyFaceSimplices(i, s, p);
@@ -187,9 +268,19 @@ int main() {
 				fd[s[j]] += TwoVector4(pj[1] - pj[0], dv);
 			}
 		}
-	}
+*/	}
 	else {
-		for(i=0; i<mesh.getQuadSize(); i++) {
+		for(i=0; i<fd.size(); i++) {
+			Buffer<uint> s;
+			Buffer<Vector4> p;
+			mesh.getFaceQuadSimplices(i, s, p);
+			for(j=0; j<s.size(); j++) {
+				const Vector4 *pj = &p[3 * j];
+				const double dv = mesh.getQuadVector(s[j]).unit().dual() / 2.0;
+				fd[i] += TwoVector4(pj[1] - pj[0], pj[2] - pj[0]) * dv;
+			}
+		}
+/*		for(i=0; i<mesh.getQuadSize(); i++) {
 			Buffer<uint> s;
 			Buffer<Vector4> p;
 			mesh.getQuadFaceSimplices(i, s, p);
@@ -199,7 +290,7 @@ int main() {
 				fd[s[j]] += TwoVector4(pj[1] - pj[0], pj[2] - pj[0]) * dv;
 			}
 		}
-	}
+*/	}
 	for(i=0; i<fd.size(); i++) {
 		const double diff = (mesh.getFaceDualVector(i) - fd[i]).len();
 		if(fabs(diff) > 1e-12) cout << "Face dual " << diff << " " << fd[i].len() << endl;
@@ -213,7 +304,17 @@ int main() {
 		}
 	}
 	else {
-		for(i=0; i<mesh.getQuadSize(); i++) {
+		for(i=0; i<bd.size(); i++) {
+			Buffer<uint> s;
+			Buffer<Vector4> p;
+			mesh.getBodyQuadSimplices(i, s, p);
+			for(j=0; j<s.size(); j++) {
+				const Vector4 *pj = &p[2 * j];
+				const double dv = mesh.getQuadVector(s[j]).unit().dual();
+				bd[i] += (pj[1] - pj[0]) * dv;
+			}
+		}
+/*		for(i=0; i<mesh.getQuadSize(); i++) {
 			Buffer<uint> s;
 			Buffer<Vector4> p;
 			mesh.getQuadBodySimplices(i, s, p);
@@ -223,7 +324,7 @@ int main() {
 				bd[s[j]] += (pj[1] - pj[0]) * dv;
 			}
 		}
-	}
+*/	}
 	for(i=0; i<bd.size(); i++) {
 		const double diff = (mesh.getBodyDualVector(i) - bd[i]).len();
 		if(fabs(diff) > 1e-12) cout << "Body dual " << diff << " " << bd[i].len() << endl;

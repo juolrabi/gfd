@@ -216,6 +216,21 @@ public:
 		m_data = data;
 		m_size = size;
 	}
+	void mergesum(const Buffer &buf) { // merges another buffer by summing up each common terms
+		if(m_size < buf.m_size) {
+			T *data = new T[buf.m_size];
+			memcpy(data, buf.m_data, buf.m_size * sizeof(T));
+			if(m_data) {
+				for(uint i=0; i<m_size; i++) data[i] += m_data[i];
+				delete[] m_data;
+			}
+			m_data = data;
+			m_size = buf.m_size;
+		}
+		else {
+			for(uint i=0; i<buf.m_size; i++) m_data[i] += buf.m_data[i];
+		}
+	}
 	bool includes(const T &val, const uint size) const
 	{
 		for(uint i=0; i<size; i++)

@@ -7,6 +7,7 @@
 #include "../../GFD/Discrete/Split.hpp"
 #include "../../GFD/Discrete/Dec.hpp"
 #include <iostream>
+#include <chrono>
 
 using namespace std;
 using namespace gfd;
@@ -38,6 +39,19 @@ void get3(const Vector4 &p, double *result) {
 	result[0] = cos(3*p.lensq());
 	result[1] = sin(1*p.lensq());
 	result[2] = p.lensq();
+}
+
+void getConstant1(const Vector4 &p, double *result) {
+	result[0] = 2.0;
+}
+void getConstant2(const Vector4 &p, double *result) {
+	result[0] = 2.0;
+	result[1] = -1.0;
+}
+void getConstant3(const Vector4 &p, double *result) {
+	result[0] = 2.0;
+	result[1] = -1.0;
+	result[2] = 3.0;
 }
 
 void get1Form(const Vector4 &p, double *result)
@@ -97,7 +111,6 @@ void get1Hodge2d(const Vector4 &p, double *result)
 	}
 }
 
-
 int main()
 {
 	initMPI();
@@ -107,11 +120,9 @@ int main()
 	const double h = (w>1 ? 3.0 / double(w - 1) : 3.0);
 	Buffer<uchar> data(w * w, 3);
 //	data[4] = 11;
-	for(uint i=0; i<w; i++)
-	{
+	for(uint i=0; i<w; i++) {
 		const uint ii = (i-10) * (i-10);
-		for(uint j=0; j<w; j++)
-		{
+		for(uint j=0; j<w; j++) {
 			const uint jj = (j-10) * (j-10);
 			if(ii + jj < 7) data[j * w + i] = 11;
 			else if(ii + jj < 25) data[j * w + i] = 4;
@@ -120,16 +131,125 @@ int main()
 	BlockMesh bm;
 	bm.init(Vector2(-1,-1), Vector2(h,h), w, w, &data[0]);
 
+/*	// 3d
+	const uint w = 11;
+	const double h = (w>1 ? 3.0 / double(w - 1) : 3.0);
+	Buffer<uchar> data(w * w * w, 3);
+	for(uint i=0; i<w; i++) {
+		const uint ii = (i-5) * (i-5);
+		for(uint j=0; j<w; j++) {
+			const uint jj = (j-5) * (j-5);
+			for(uint k=0; k<w; k++) {
+				const uint kk = (k-5) * (k-5);
+				if(ii + jj + kk < 7) data[(k * w + j) * w + i] = 4;
+			}
+		}
+	}
+	BlockMesh bm;
+	bm.init(Vector3(-1,-1, -1), Vector3(h,h,h), w, w, w, &data[0]);
+*/
 	// create a PartMesh from BlockMesh
 	PartMesh mesh(getMPIrank(), getMPIranks(), 2);
 	bm.toMesh(mesh);
 
-{ 
-	FormGrade grade = fg_dual1;
-	FormGrade hgrade = FormGradeDual(grade);
+{
+	FormGrade grade = fg_dual0; 
+	void (*func)(const Vector4 &p, double *) = &get1;
+	void (*constfunc)(const Vector4 &p, double *) = &getConstant1;
 	const uint num = 2;
+	Dec dec(mesh, 0, mesh.getDimension());
+	Buffer<double> buf(3, 0.0);
+	constfunc(Vector4(0,0,0,0), &buf[0]);
+
 	Form<double> f0;
-	bm.integrateForm(grade, get2, num, f0);
+	auto starttime = chrono::system_clock::now();
+	bm.integrateForm(grade, func, num, f0);
+	cout << "f0 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
+
+	Form<double> f1;
+	starttime = chrono::system_clock::now();
+	dec.integrateForm(grade, func, num, f1);
+	cout << "f1 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
+
+	Form<double> f2;
+	starttime = chrono::system_clock::now();
+	dec.integrateForm(grade, UINTSETALL, func, num, f2);
+	cout << "f2 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
+
+	Form<double> f3;
+	starttime = chrono::system_clock::now();
+	dec.integrateForm(UINTSETALL, grade, func, num, f3);
+	cout << "f3 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
+
+	Form<double> cf0;
+	starttime = chrono::system_clock::now();
+	bm.integrateForm(grade, constfunc, 1, cf0);
+	cout << "cf0 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
+
+	Form<double> cf1;
+	starttime = chrono::system_clock::now();
+	dec.integrateConstantForm(grade, &buf[0], cf1);
+	cout << "cf1 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
+
+	Form<double> cf2;
+	starttime = chrono::system_clock::now();
+	dec.integrateConstantForm(grade, UINTSETALL, &buf[0], cf2);
+	cout << "cf2 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
+
+	Form<double> cf3;
+	starttime = chrono::system_clock::now();
+	dec.integrateConstantForm(UINTSETALL, grade, &buf[0], cf3);
+	cout << "cf3 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
+
+	double summ = 0.0;
+	double sum1 = 0.0;
+	double sum2 = 0.0;
+	double sum3 = 0.0;
+	double csumm = 0.0;
+	double csum1 = 0.0;
+	double csum2 = 0.0;
+	double csum3 = 0.0;
+	for(uint j=0; j<f0.m_height; j++) {
+		const double val = f0.getValue(j);
+		summ += val * val;
+		const double dif1 = val - f1.getValue(j);
+		sum1 += dif1 * dif1;
+		const double dif2 = val - f2.getValue(j);
+		sum2 += dif2 * dif2;
+		const double dif3 = val - f3.getValue(j);
+		sum3 += dif3 * dif3;
+		const double cval = cf0.getValue(j);
+		csumm += cval * cval;
+		const double cdif1 = cval - cf1.getValue(j);
+		csum1 += cdif1 * cdif1;
+		const double cdif2 = cval - cf2.getValue(j);
+		csum2 += cdif2 * cdif2;
+		const double cdif3 = cval - cf3.getValue(j);
+		csum3 += cdif3 * cdif3;
+	}
+	sumMPI(&summ, 1);
+	sumMPI(&sum1, 1);
+	sumMPI(&sum2, 1);
+	sumMPI(&sum3, 1);
+	sumMPI(&csumm, 1);
+	sumMPI(&csum1, 1);
+	sumMPI(&csum2, 1);
+	sumMPI(&csum3, 1);
+
+	if(getMPIrank() == 0) {
+		cout << "summ = " << summ << endl;
+		cout << "sum1 = " << sum1 << endl;
+		cout << "sum2 = " << sum2 << endl;
+		cout << "sum3 = " << sum3 << endl;
+		cout << "csumm = " << csumm << endl;
+		cout << "csum1 = " << csum1 << endl;
+		cout << "csum2 = " << csum2 << endl;
+		cout << "csum3 = " << csum3 << endl;
+	}
+/*
+	FormGrade hgrade = FormGradeDual(grade);
+	Form<double> f0;
+	bm.integrateForm(grade, get1, num, f0);
 	Hodge<double> h0;
 	bm.integrateHodge(grade, get1Hodge, num, h0);
 	Form<double> f1;
@@ -140,7 +260,10 @@ int main()
 
 	Dec dec(mesh);
 	Form<double> decf0;
-	dec.integrateForm(grade, get2, num, decf0);
+	auto starttime = chrono::system_clock::now();
+	dec.integrateForm(grade, get1, num, decf0);
+//	dec.integrateFormBaseUp(grade, 0, 2, UINTSETALL, get1, num, decf0);
+	cout << "Elapsed time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
 	Hodge<double> dech0;
 	dec.integrateHodge(grade, get1Hodge, num, dech0);
 	Form<double> decf1;
@@ -148,16 +271,16 @@ int main()
 
 	double sum = 0.0;
 	double summ = 0.0;
-	for(uint j=0; j<f1.m_height; j++) {
-		const double val = f1.getValue(j);
-		const double dif = val - decf1.getValue(j);
+	for(uint j=0; j<f0.m_height; j++) {
+		const double val = f0.getValue(j);
+		const double dif = val - decf0.getValue(j);
 		sum += dif * dif;
 		summ += val * val;
 		//cout << mesh.getNodeHodge(j) << " " << dech0.m_val[j] << endl;
 	}
 	sumMPI(&sum, 1);
 	sumMPI(&summ, 1);
-
+*/
 	// draw f0 at the end
 	double check = 0.0;
 	Picture pic0(500,500);
@@ -165,7 +288,7 @@ int main()
 	for(uint j=0; j<pic0.getHeight(); j++) {
 		for(uint i=0; i<pic0.getWidth(); i++) {
 			const Vector4 p(0.006 * i - 1.0, 0.006 * j - 1.0,0,0);
-			bm.interpolateForm(hgrade, f1, p, val);
+			bm.interpolateForm(grade, f3, p, val);
 			sumMPI(&val[0], val.size());
 			const Vector4 col((val.size() > 0 ? val[0] : 0.0), (val.size() > 1 ? val[1] : 0.0), (val.size() > 2 ? val[2] : 0.0), 1.0);
 			check += col.toVector3().len();
@@ -173,8 +296,6 @@ int main()
 		}
 	}
 	if(getMPIrank() == 0) {
-		cout << "sum = " << sum << endl;
-		cout << "summ = " << summ << endl;
 		cout << "check = " << check << endl;
 		pic0.save("kuva.bmp", true);
 	}
@@ -412,7 +533,6 @@ int main()
 		cout << "check = " << check << endl;
 		pic0.save("kuva.bmp", true);
 	}
-
 
 	finalizeMPI();
 
