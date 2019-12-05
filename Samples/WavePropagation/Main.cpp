@@ -153,52 +153,52 @@ int main()
 	bm.toMesh(mesh);
 
 {
-	FormGrade grade = fg_dual0; 
-	void (*func)(const Vector4 &p, double *) = &get1;
-	void (*constfunc)(const Vector4 &p, double *) = &getConstant1;
+	FormGrade grade = fg_dual1; 
+	void (*func)(const Vector4 &p, double *) = &get3;
+	void (*constfunc)(const Vector4 &p, double *) = &getConstant3;
 	const uint num = 2;
 	Dec dec(mesh, 0, mesh.getDimension());
 	Buffer<double> buf(3, 0.0);
 	constfunc(Vector4(0,0,0,0), &buf[0]);
 
-	Form<double> f0;
+	Hodge<double> f0;
 	auto starttime = chrono::system_clock::now();
-	bm.integrateForm(grade, func, num, f0);
+	bm.integrateHodge(grade, func, num, f0);
 	cout << "f0 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
 
-	Form<double> f1;
+	Hodge<double> f1;
 	starttime = chrono::system_clock::now();
-	dec.integrateForm(grade, func, num, f1);
+	dec.integrateHodge(grade, func, num, f1);
 	cout << "f1 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
 
-	Form<double> f2;
+	Hodge<double> f2;
 	starttime = chrono::system_clock::now();
-	dec.integrateForm(grade, UINTSETALL, func, num, f2);
+	dec.integrateHodge(grade, UINTSETALL, func, num, f2);
 	cout << "f2 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
 
-	Form<double> f3;
+	Hodge<double> f3;
 	starttime = chrono::system_clock::now();
-	dec.integrateForm(UINTSETALL, grade, func, num, f3);
+	dec.integrateHodge(UINTSETALL, grade, func, num, f3);
 	cout << "f3 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
 
-	Form<double> cf0;
+	Hodge<double> cf0;
 	starttime = chrono::system_clock::now();
-	bm.integrateForm(grade, constfunc, 1, cf0);
+	bm.integrateHodge(grade, constfunc, 1, cf0);
 	cout << "cf0 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
 
-	Form<double> cf1;
+	Hodge<double> cf1;
 	starttime = chrono::system_clock::now();
-	dec.integrateConstantForm(grade, &buf[0], cf1);
+	dec.integrateConstantHodge(grade, &buf[0], cf1);
 	cout << "cf1 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
 
-	Form<double> cf2;
+	Hodge<double> cf2;
 	starttime = chrono::system_clock::now();
-	dec.integrateConstantForm(grade, UINTSETALL, &buf[0], cf2);
+	dec.integrateConstantHodge(grade, UINTSETALL, &buf[0], cf2);
 	cout << "cf2 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
 
-	Form<double> cf3;
+	Hodge<double> cf3;
 	starttime = chrono::system_clock::now();
-	dec.integrateConstantForm(UINTSETALL, grade, &buf[0], cf3);
+	dec.integrateConstantHodge(UINTSETALL, grade, &buf[0], cf3);
 	cout << "cf3 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
 
 	double summ = 0.0;
@@ -210,21 +210,21 @@ int main()
 	double csum2 = 0.0;
 	double csum3 = 0.0;
 	for(uint j=0; j<f0.m_height; j++) {
-		const double val = f0.getValue(j);
+		const double val = f0.getValue(j,j);
 		summ += val * val;
-		const double dif1 = val - f1.getValue(j);
+		const double dif1 = val - f1.getValue(j,j);
 		sum1 += dif1 * dif1;
-		const double dif2 = val - f2.getValue(j);
+		const double dif2 = val - f2.getValue(j,j);
 		sum2 += dif2 * dif2;
-		const double dif3 = val - f3.getValue(j);
+		const double dif3 = val - f3.getValue(j,j);
 		sum3 += dif3 * dif3;
-		const double cval = cf0.getValue(j);
+		const double cval = cf0.getValue(j,j);
 		csumm += cval * cval;
-		const double cdif1 = cval - cf1.getValue(j);
+		const double cdif1 = cval - cf1.getValue(j,j);
 		csum1 += cdif1 * cdif1;
-		const double cdif2 = cval - cf2.getValue(j);
+		const double cdif2 = cval - cf2.getValue(j,j);
 		csum2 += cdif2 * cdif2;
-		const double cdif3 = cval - cf3.getValue(j);
+		const double cdif3 = cval - cf3.getValue(j,j);
 		csum3 += cdif3 * cdif3;
 	}
 	sumMPI(&summ, 1);
@@ -281,7 +281,7 @@ int main()
 	sumMPI(&sum, 1);
 	sumMPI(&summ, 1);
 */
-	// draw f0 at the end
+/*	// draw f0 at the end
 	double check = 0.0;
 	Picture pic0(500,500);
 	Buffer<double> val(3, 0.0);
@@ -299,7 +299,7 @@ int main()
 		cout << "check = " << check << endl;
 		pic0.save("kuva.bmp", true);
 	}
-}
+*/}
 
 	finalizeMPI();
 

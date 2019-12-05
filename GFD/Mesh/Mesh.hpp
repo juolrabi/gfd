@@ -341,28 +341,6 @@ public:
 	Vector4 getQuadFaceVectors(const uint q, Buffer<uint> &f, Buffer<TwoVector4> &v) const;
 	Vector4 getQuadBodyVectors(const uint q, Buffer<uint> &b, Buffer<Vector4> &v) const;
 
-	void gatherNodeSimplices(const uint n, Buffer<Vector4> &p, uint &ps, Buffer<double> &v, uint &vs) const;
-	void gatherEdgeSimplices(const uint e, Buffer<Vector4> &p, uint &ps, Buffer<Vector4> &v, uint &vs) const;
-	void gatherFaceSimplices(const uint f, Buffer<Vector4> &p, uint &ps, Buffer<TwoVector4> &v, uint &vs) const;
-	void gatherBodySimplices(const uint b, Buffer<Vector4> &p, uint &ps, Buffer<ThreeVector4> &v, uint &vs) const;
-	void gatherQuadSimplices(const uint q, Buffer<Vector4> &p, uint &ps, Buffer<FourVector4> &v, uint &vs) const;
-	void gatherNodeDualSimplices(const uint n, Buffer<Vector4> &p, uint &ps, Buffer<FourVector4> &v, uint &vs) const;
-	void gatherEdgeDualSimplices(const uint e, Buffer<Vector4> &p, uint &ps, Buffer<ThreeVector4> &v, uint &vs) const;
-	void gatherFaceDualSimplices(const uint f, Buffer<Vector4> &p, uint &ps, Buffer<TwoVector4> &v, uint &vs) const;
-	void gatherBodyDualSimplices(const uint b, Buffer<Vector4> &p, uint &ps, Buffer<Vector4> &v, uint &vs) const;
-	void gatherQuadDualSimplices(const uint q, Buffer<Vector4> &p, uint &ps, Buffer<double> &v, uint &vs) const;
-
-/*	Buffer<double> getNodeQuadrature(const uint n) const;
-	Buffer<double> getEdgeQuadrature(const uint e, const double h) const;
-	Buffer<double> getFaceQuadrature(const uint f, const double h) const;
-	Buffer<double> getBodyQuadrature(const uint b, const double h) const;
-	Buffer<double> getQuadQuadrature(const uint q, const double h) const;
-	Buffer<double> getNodeDualQuadrature(const uint n, const double h) const;
-	Buffer<double> getEdgeDualQuadrature(const uint e, const double h) const;
-	Buffer<double> getFaceDualQuadrature(const uint f, const double h) const;
-	Buffer<double> getBodyDualQuadrature(const uint b, const double h) const;
-	Buffer<double> getQuadDualQuadrature(const uint q) const;
-*/
 protected:
 
 	uint m_dim; // vector space dimension

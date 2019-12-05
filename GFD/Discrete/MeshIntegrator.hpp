@@ -18,35 +18,13 @@ public:
 	MeshIntegrator(const PartMesh &mesh, const FormGrade grade, const uint num, const uint lowdim, const uint highdim);
 	virtual ~MeshIntegrator() { }
 
-	uint getFields() const { return getFields(FormGradeDimension(m_grade)); }
-	uint getWedgeFields() const { return getWedgeFields(FormGradeDimension(m_grade)); }
-
-	void gatherSetter0(const uint i, Buffer<double> &q, uint &qs) const;
-	void gatherWedgeSetter0(const uint i, Buffer<double> &q, uint &qs) const;
-
 	Buffer<double> &getVector(const uint i, Buffer<double> &q) const;
 	Buffer< pair<uint, Buffer<double> > > &getBaseVector(const uint i, Buffer< pair<uint, Buffer<double> > > &q) const;
-
 	Buffer<double> &getQuadrature(const uint i, Buffer<double> &q) const;
 	Buffer< pair<uint, Buffer<double> > > &getBaseQuadrature(const uint i, Buffer< pair<uint, Buffer<double> > > &q) const;
 
 	Buffer<double> &invertVector(Buffer<double> &q) const;
 	Buffer<double> &invertQuadrature(const Vector4 &p, Buffer<double> &q) const;
-
-	void gatherSetter(const uint i, Buffer<double> &q, uint &qs) const;
-	void gatherWedgeSetter(const uint i, Buffer<double> &q, uint &qs) const;
-
-	uint getLocals() const { return getLocals(FormGradeDimension(m_grade)); }
-	uint getSize() const { return getSize(FormGradeDimension(m_grade)); }
-	const Buffer< pair<uint,uint> > &getExternals() const { return getExternals(FormGradeDimension(m_grade)); }
-	uint getFlag(const uint i) const { return getFlag(i, FormGradeDimension(m_grade)); }
-	Vector4 getPosition(const uint i) const { return getPosition(i, FormGradeDimension(m_grade)); }
-
-	uint getBaseLocals() const { return getLocals(getBaseDimension()); }
-	uint getBaseSize() const { return getSize(getBaseDimension()); }
-	const Buffer< pair<uint,uint> > &getBaseExternals() const { return getExternals(getBaseDimension()); }
-	uint getBaseFlag(const uint i) const { return getFlag(i, getBaseDimension()); }
-	Vector4 getBasePosition(const uint i) const { return getPosition(i, getBaseDimension()); }
 
 	template<typename T> void integrateVector(const Buffer<double> &q, const T *f, T &val) const {
 		for(uint i=0; i<q.size(); i++) val += q[i] * f[i];
@@ -99,6 +77,20 @@ public:
 		}
 	}
 
+	uint getFields() const;
+	uint getLocals() const { return getLocals(FormGradeDimension(m_grade)); }
+	uint getSize() const { return getSize(FormGradeDimension(m_grade)); }
+	const Buffer< pair<uint,uint> > &getExternals() const { return getExternals(FormGradeDimension(m_grade)); }
+	uint getFlag(const uint i) const { return getFlag(i, FormGradeDimension(m_grade)); }
+	Vector4 getPosition(const uint i) const { return getPosition(i, FormGradeDimension(m_grade)); }
+
+	uint getBaseLocals() const { return getLocals(getBaseDimension()); }
+	uint getBaseSize() const { return getSize(getBaseDimension()); }
+	const Buffer< pair<uint,uint> > &getBaseExternals() const { return getExternals(getBaseDimension()); }
+	uint getBaseFlag(const uint i) const { return getFlag(i, getBaseDimension()); }
+	Vector4 getBasePosition(const uint i) const { return getPosition(i, getBaseDimension()); }
+
+
 protected:
 	const PartMesh &m_mesh;
 	FormGrade m_grade;
@@ -118,11 +110,8 @@ protected:
 	template<typename V> Buffer<double> &createSingleQuadrature(const Vector4 &p, const V &v, Buffer<double> &q) const;
 	template<typename V> Buffer< pair<uint, Buffer<double> > > &createSingleBaseQuadrature(const uint i, const Vector4 &p, const V &v, Buffer< pair<uint, Buffer<double> > > &q) const;
 	Buffer<double> &createMultiQuadrature(const uint elems, const Buffer<Vector4> &p, const Buffer<double> &v, Buffer<double> &q) const;
-	Buffer<double> &getEdgeSetter(const Buffer<Vector4> &p, const Buffer<double> &v, Buffer<double> &q) const;
 
 	uint getBaseDimension() const { return (FormGradeIsPrim(m_grade) ? m_lowdim : m_highdim); }
-	uint getFields(const uint gdim) const;
-	uint getWedgeFields(const uint gdim) const;
 	uint getLocals(const uint gdim) const;
 	uint getSize(const uint gdim) const;
 	const Buffer< pair<uint,uint> > &getExternals(const uint gdim) const;
@@ -134,15 +123,6 @@ protected:
 	void setVector(const TwoVector4 &v, Buffer<double> &q, uint &qs) const;
 	void setVector(const ThreeVector4 &v, Buffer<double> &q, uint &qs) const;
 	void setVector(const FourVector4 &v, Buffer<double> &q, uint &qs) const;
-	void gatherQuadrature(const Vector4 &p, const double w, Buffer<double> &q, uint &qs) const;
-	void gatherQuadrature(const Buffer<Vector4> &p, const double w, Buffer<double> &q, uint &qs) const;
-	void gatherVector(const Vector4 &v, Buffer<double> &q, uint &qs) const;
-	void gatherVector(const TwoVector4 &v, Buffer<double> &q, uint &qs) const;
-	void gatherVector(const ThreeVector4 &v, Buffer<double> &q, uint &qs) const;
-	void gatherVector(const FourVector4 &v, Buffer<double> &q, uint &qs) const;
-	template<typename V> void gatherQuadrature(const Buffer<Vector4> &p, const uint ps, const Buffer<V> &v, const uint vs, const bool dual, Buffer<double> &q, uint &qs) const;
-	template<typename V> void gatherQuadrature(const Buffer<Vector4> &p, const bool dual, Buffer<double> &q, uint &qs) const;
-	void gatherWedgeQuadrature(const Buffer<double> &prim, const uint prims, const Buffer<double> &dual, const uint duals, const Vector4 &p0, Buffer<double> &q, uint &qs) const;
 
 };
 

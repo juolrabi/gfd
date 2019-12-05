@@ -33,19 +33,16 @@ public:
 	const Buffer< pair<uint,uint> > &getExternal() const { return m_ext; }
 	template<typename T> void integrate(void func(const Vector4 &, T *result), const Vector4 &p0, T *result, const Buffer<T *> &exterm) const {
 		Buffer<T> f(m_fields);
-		for(uint i=0; i<m_setter.size(); i++)
-		{
+		for(uint i=0; i<m_setter.size(); i++) {
 			T &ival = (i < m_values ? result[i] : *exterm[i - m_values]);
 			const Buffer<double> &setteri = m_setter[i];
-			for(uint j=m_fields; j<setteri.size(); )
-			{
-				const double fac = setteri[j++];
+			for(uint j=0; j<setteri.size(); ) {
 				Vector4 p(setteri[j++] + p0.x,0,0,0);
 				if(m_dim >= 2) p.y = setteri[j++] + p0.y;
 				if(m_dim >= 3) p.z = setteri[j++] + p0.z;
 				if(m_dim >= 4) p.t = setteri[j++] + p0.t;
 				func(p, &f[0]);
-				for(uint k=0; k<m_fields; k++) ival += fac * setteri[k] * f[k];
+				for(uint k=0; k<m_fields; k++) ival += setteri[j++] * f[k];
 			}
 		}
 	}

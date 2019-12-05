@@ -3,8 +3,7 @@
 using namespace std;
 using namespace gfd;
 
-BlockInterpolator::BlockInterpolator()
-{
+BlockInterpolator::BlockInterpolator() {
 	m_dim = 1;
 	m_fields = 1;
 	m_values = 0;
@@ -12,8 +11,7 @@ BlockInterpolator::BlockInterpolator()
 	m_d = Vector4(1,1,1,1);
 }
 
-void BlockInterpolator::clear()
-{
+void BlockInterpolator::clear() {
 	m_getter.clear();
 	m_dim = 1;
 	m_fields = 1;
@@ -22,8 +20,7 @@ void BlockInterpolator::clear()
 	m_d = Vector4(1,1,1,1);
 }
 
-void BlockInterpolator::init(const FormGrade grade, const PartMesh &mesh, const Vector4 &d, const uint num)
-{
+void BlockInterpolator::init(const FormGrade grade, const PartMesh &mesh, const Vector4 &d, const uint num) {
 	clear();
 
 	BlockIntegrator block;
@@ -36,23 +33,41 @@ void BlockInterpolator::init(const FormGrade grade, const PartMesh &mesh, const 
 	const Buffer<bool> ignore = getBoundaries(mesh, grade);
 
 	// init m_order and m_getter
-	uint i, j, k;
+	uint i, j, k, l;
 	MatrixN A;
 	Buffer<VectorN> v(m_values);
 	Buffer<VectorN> w(m_values);
 	m_order = getOrder(m_values / m_fields);
-	for(i=0; i<m_values; i++)
-	{
+	for(i=0; i<m_values; i++) {
+		// compute v[i] and w[i] (w[i] ~= weight * v[i])
 		v[i].toVectorN(m_order * m_fields);
 		w[i].toVectorN(m_order * m_fields);
 		if(i < ignore.size() && ignore[i]) continue;
 
 		const Buffer<double> &setteri = block.getIntegrationData(i);
 
-		VectorN vi, wi;
+		for(j=0; j<setteri.size();) {
+			Vector4 p(setteri[j++],0,0,0);
+			if(m_dim >= 2) p.y = setteri[j++];
+			if(m_dim >= 3) p.z = setteri[j++];
+			if(m_dim >= 4) p.t = setteri[j++];
+			const VectorN vj = getOrderFactors(p);
+			const VectorN wj = getWeight(p) * vj;
+			for(k=0; k<m_fields; k++) {
+				const double setterik = setteri[j++];
+				for(l=0; l<m_order; l++) {
+					const uint ll = l * m_fields + k;
+					v[i][ll] += setterik * vj[l];
+					w[i][ll] += setterik * wj[l];
+				}
+			}
+		}
+		A += w[i].outerProduct(v[i]);
+
+
+/*		VectorN vi, wi;
 		//double sum = 0.0;
-		for(j=m_fields; j<setteri.size();)
-		{
+		for(j=m_fields; j<setteri.size();) {
 			const double fac = setteri[j++];
 			//sum += fac;
 			Vector4 p(setteri[j++],0,0,0);
@@ -64,32 +79,27 @@ void BlockInterpolator::init(const FormGrade grade, const PartMesh &mesh, const 
 			wi += getWeight(p) * vj;
 		}
 		//std::cout << sum << std::endl;
-		for(j=0; j<m_order; j++)
-		{
+		for(j=0; j<m_order; j++) {
 			const uint jfields = j * m_fields;
-			for(k=0; k<m_fields; k++)
-			{
+			for(k=0; k<m_fields; k++) {
 				v[i][jfields + k] += setteri[k] * vi[j];
 				w[i][jfields + k] += setteri[k] * wi[j];
 			}
 		}
 		A += w[i].outerProduct(v[i]);
-	}
+*/	}
 
-	while(true)
-	{
+	while(true) {
 		// initialize m_getter
 		const uint ofs = m_order * m_fields;
 		m_getter.resize(m_values * ofs);
 		if(m_getter.size() == 0) break;
 
 		const MatrixN invA(A.inverse());
-		if(invA.size() == ofs)
-		{
+		if(invA.size() == ofs) {
 			// A is invertible
 			// update values of m_getter
-			for(i=0; i<m_values; i++)
-			{
+			for(i=0; i<m_values; i++) {
 				const VectorN vi = invA * w[i];
 
 				// check stability
@@ -109,8 +119,7 @@ void BlockInterpolator::init(const FormGrade grade, const PartMesh &mesh, const 
 	}
 }
 
-Buffer<bool> BlockInterpolator::getBoundaries(const Mesh &mesh, const FormGrade grade) const
-{
+Buffer<bool> BlockInterpolator::getBoundaries(const Mesh &mesh, const FormGrade grade) const {
 	Buffer<bool> boun;
 	const uint gdim = FormGradeDimension(grade);
 	if(FormGradeIsPrim(grade)) return boun;
@@ -123,20 +132,15 @@ Buffer<bool> BlockInterpolator::getBoundaries(const Mesh &mesh, const FormGrade 
 
 	if(mesh.getEdgeSize() == 0) return boun; // 0d
 	uint i, j;
-	if(gdim < 1)
-	{
-		for(i=0; i<mesh.getNodeSize(); i++)
-		{
+	if(gdim < 1) {
+		for(i=0; i<mesh.getNodeSize(); i++) {
 			if(mesh.getNodeEdges(i).size() < 2) boun[i] = true;
 		}
 	}
 	if(mesh.getFaceSize() == 0) return boun; // 1d
-	if(gdim < 2)
-	{
-		for(i=0; i<mesh.getEdgeSize(); i++)
-		{
-			if(mesh.getEdgeFaces(i).size() < 2)
-			{
+	if(gdim < 2) {
+		for(i=0; i<mesh.getEdgeSize(); i++) {
+			if(mesh.getEdgeFaces(i).size() < 2) {
 				Buffer<uint> par;
 				if(gdim == 1) par = Buffer<uint>(1, i);
 				else par = mesh.getEdgeNodes(i);
@@ -145,12 +149,9 @@ Buffer<bool> BlockInterpolator::getBoundaries(const Mesh &mesh, const FormGrade 
 		}
 	}
 	if(mesh.getBodySize() == 0) return boun; // 2d
-	if(gdim < 3)
-	{
-		for(i=0; i<mesh.getFaceSize(); i++)
-		{
-			if(mesh.getFaceBodies(i).size() < 2)
-			{
+	if(gdim < 3) {
+		for(i=0; i<mesh.getFaceSize(); i++) {
+			if(mesh.getFaceBodies(i).size() < 2) {
 				Buffer<uint> par;
 				if(gdim == 2) par = Buffer<uint>(1, i);
 				else if(gdim == 1) par = mesh.getFaceEdges(i);
@@ -160,13 +161,9 @@ Buffer<bool> BlockInterpolator::getBoundaries(const Mesh &mesh, const FormGrade 
 		}
 	}
 	if(mesh.getQuadSize() == 0) return boun; // 3d
-
-	if(gdim < 4)
-	{
-		for(i=0; i<mesh.getBodySize(); i++)
-		{
-			if(mesh.getBodyQuads(i).size() < 2)
-			{
+	if(gdim < 4) {
+		for(i=0; i<mesh.getBodySize(); i++) {
+			if(mesh.getBodyQuads(i).size() < 2) {
 				Buffer<uint> par;
 				if(gdim == 3) par = Buffer<uint>(1, i);
 				else if(gdim == 2) par = mesh.getBodyFaces(i);
@@ -177,63 +174,7 @@ Buffer<bool> BlockInterpolator::getBoundaries(const Mesh &mesh, const FormGrade 
 		}
 	}
 	return boun; // 4d
-
-/*	if(mesh.getEdgeSize() == 0) return boun;
-	uint i, j;
-	if(mesh.getFaceSize() == 0) // 1d
-	{
-		if(gdim > 0) return boun;
-		for(i=0; i<mesh.getNodeSize(); i++)
-		{
-			if(mesh.getNodeEdges(i).size() < 2) boun[i] = true;
-		}
-		return boun;
-	}
-	if(mesh.getBodySize() == 0) // 2d
-	{
-		if(gdim > 1) return boun;
-		for(i=0; i<mesh.getEdgeSize(); i++)
-		{
-			if(mesh.getEdgeFaces(i).size() < 2)
-			{
-				Buffer<uint> par;
-				if(gdim == 1) par = Buffer<uint>(1, i);
-				else par = mesh.getEdgeNodes(i);
-				for(j=0; j<par.size(); j++) boun[par[j]] = true;
-			}
-		}
-		return boun;
-	}
-	if(mesh.getQuadSize() == 0) // 3d
-	{
-		if(gdim > 2) return boun;
-		for(i=0; i<mesh.getFaceSize(); i++)
-		{
-			if(mesh.getFaceBodies(i).size() < 2)
-			{
-				Buffer<uint> par;
-				if(gdim == 2) par = Buffer<uint>(1, i);
-				else if(gdim == 1) par = mesh.getFaceEdges(i);
-				else par = mesh.getFaceNodes(i);
-				for(j=0; j<par.size(); j++) boun[par[j]] = true;
-			}
-		}
-		return boun;
-	}
-	for(i=0; i<mesh.getBodySize(); i++) // 4d
-	{
-		if(mesh.getBodyQuads(i).size() < 2)
-		{
-			Buffer<uint> par;
-			if(gdim == 3) par = Buffer<uint>(1, i);
-			else if(gdim == 2) par = mesh.getBodyFaces(i);
-			else if(gdim == 1) par = mesh.getBodyEdges(i);
-			else par = mesh.getBodyNodes(i);
-			for(j=0; j<par.size(); j++) boun[par[j]] = true;
-		}
-	}
-	return boun;
-*/}
+}
 
 uint BlockInterpolator::getOrder(const uint order) const
 {
