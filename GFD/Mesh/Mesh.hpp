@@ -227,7 +227,7 @@ public:
 	double getQuadDualVector(const uint q) const;
 
 	// diagonal Hodge terms
-/*	double getNodeHodge(const uint n) const;
+	double getNodeHodge(const uint n) const;
 	double getNodeHodge(const uint n, const double &metric) const;
 	double getEdgeHodge(const uint e) const;
 	double getEdgeHodge(const uint e, const SymMatrix4 &metric) const;
@@ -237,7 +237,7 @@ public:
 	double getBodyHodge(const uint b, const SymThreeMatrix4 &metric) const;
 	double getQuadHodge(const uint q) const;
 	double getQuadHodge(const uint q, const SymFourMatrix4 &metric) const;
-*/
+
 	// get deviation vector from the cell plane to position p (independent of metric)
 	Vector4 getEdgeDeviation(const uint e, const Vector4 &p) const;
 	Vector4 getFaceDeviation(const uint f, const Vector4 &p) const;

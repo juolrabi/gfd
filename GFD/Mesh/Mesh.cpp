@@ -1737,156 +1737,160 @@ Vector4 Mesh::getBodyDualVector(const uint b) const {
 double Mesh::getQuadDualVector(const uint q) const {
 	return (getQuadVector(q).dual() > 0.0 ? 1.0 : -1.0);
 }
-/*
-double Mesh::getNodeHodge(const uint n) const
-{
-	if(m_dim == 1) return getNodeDualVector1(n);
-	if(m_dim == 2) return getNodeDualVector2(n).xy;
-	if(m_dim == 3) return getNodeDualVector3(n).xyz;
-	return getNodeDualVector4(n).xyzt;
-}
-double Mesh::getNodeHodge(const uint n, const double &metric) const
-{
-	if(m_dim == 1) return metric * getNodeDualVector1(n);
-	if(m_dim == 2) return metric * getNodeDualVector2(n).xy;
-	if(m_dim == 3) return metric * getNodeDualVector3(n).xyz;
-	return metric * getNodeDualVector4(n).xyzt;
-}
 
-double Mesh::getEdgeHodge(const uint e) const
-{
-	if(m_dim == 1)
-	{
+double Mesh::getNodeHodge(const uint n) const {
+	switch(m_dim) {
+	case 1: return getNodeDualVector1(n);
+	case 2: return getNodeDualVector2(n).xy;
+	case 3: return getNodeDualVector3(n).xyz;
+	default: return getNodeDualVector4(n).xyzt;
+	}
+}
+double Mesh::getNodeHodge(const uint n, const double &metric) const {
+	switch(m_dim) {
+	case 1: return metric * getNodeDualVector1(n);
+	case 2: return metric * getNodeDualVector2(n).xy;
+	case 3: return metric * getNodeDualVector3(n).xyz;
+	default: return metric * getNodeDualVector4(n).xyzt;
+	}
+}
+double Mesh::getEdgeHodge(const uint e) const {
+	switch(m_dim) {
+	case 1: {
 		const double ev = getEdgeVector1(e);
 		const double edv = getEdgeDualVector1(e);
 		if(m_m.empty()) return edv / ev;
-		return getMetric1() * edv / ev;
+		return getMetric1(getEdgeFlag(e)) * edv / ev;
 	}
-	if(m_dim == 2)
-	{
+	case 2: {
 		const Vector2 ev = getEdgeVector2(e);
 		const Vector2 edv = getEdgeDualVector2(e);
 		if(m_m.empty()) return TwoVector2(ev, edv).xy / ev.lensq();
-		return TwoVector2(getMetric2() * ev, edv).xy / ev.lensq();
+		return TwoVector2(getMetric2(getEdgeFlag(e)) * ev, edv).xy / ev.lensq();
 	}
-	if(m_dim == 3)
-	{
+	case 3: {
 		const Vector3 ev = getEdgeVector3(e);
 		const TwoVector3 edv = getEdgeDualVector3(e);
 		if(m_m.empty()) return ThreeVector3(ev, edv).xyz / ev.lensq();
-		return ThreeVector3(getMetric3() * ev, edv).xyz / ev.lensq();
+		return ThreeVector3(getMetric3(getEdgeFlag(e)) * ev, edv).xyz / ev.lensq();
 	}
-	const Vector4 ev = getEdgeVector4(e);
-	const ThreeVector4 edv = getEdgeDualVector4(e);
-	if(m_m.empty()) return FourVector4(ev, edv).xyzt / ev.lensq();
-	return FourVector4(getMetric4() * ev, edv).xyzt / ev.lensq();
+	default: {
+		const Vector4 ev = getEdgeVector4(e);
+		const ThreeVector4 edv = getEdgeDualVector4(e);
+		if(m_m.empty()) return FourVector4(ev, edv).xyzt / ev.lensq();
+		return FourVector4(getMetric4(getEdgeFlag(e)) * ev, edv).xyzt / ev.lensq();
+	}
+	}
 }
-double Mesh::getEdgeHodge(const uint e, const SymMatrix4 &metric) const
-{
-	if(m_dim == 1)
-	{
+double Mesh::getEdgeHodge(const uint e, const SymMatrix4 &metric) const {
+	switch(m_dim) {
+	case 1: {
 		const double ev = getEdgeVector1(e);
 		const double edv = getEdgeDualVector1(e);
 		return metric.xx * edv / ev;
 	}
-	if(m_dim == 2)
-	{
+	case 2: {
 		const Vector2 ev = getEdgeVector2(e);
 		const Vector2 edv = getEdgeDualVector2(e);
 		return TwoVector2(metric.toSymMatrix2() * ev, edv).xy / ev.lensq();
 	}
-	if(m_dim == 3)
-	{
+	case 3: {
 		const Vector3 ev = getEdgeVector3(e);
 		const TwoVector3 edv = getEdgeDualVector3(e);
 		return ThreeVector3(metric.toSymMatrix3() * ev, edv).xyz / ev.lensq();
 	}
-	const Vector4 ev = getEdgeVector4(e);
-	const ThreeVector4 edv = getEdgeDualVector4(e);
-	return FourVector4(metric * ev, edv).xyzt / ev.lensq();
+	default: {
+		const Vector4 ev = getEdgeVector4(e);
+		const ThreeVector4 edv = getEdgeDualVector4(e);
+		return FourVector4(metric * ev, edv).xyzt / ev.lensq();
+	}
+	}
 }
 
-double Mesh::getFaceHodge(const uint f) const
-{
-	if(m_dim == 2)
-	{
+double Mesh::getFaceHodge(const uint f) const {
+	switch(m_dim) {
+	case 2: {
 		const TwoVector2 fv = getFaceVector2(f);
 		const double fdv = getFaceDualVector2(f);
 		if(m_m.empty()) return fdv / fv.xy;
-		return SymTwoMatrix2(getMetric2()).xyxy * fdv / fv.xy;
+		return SymTwoMatrix2(getMetric2(getFaceFlag(f))).xyxy * fdv / fv.xy;
 	}
-	if(m_dim == 3)
-	{
+	case 3: {
 		const TwoVector3 fv = getFaceVector3(f);
 		const Vector3 fdv = getFaceDualVector3(f);
 		if(m_m.empty()) return ThreeVector3(fv, fdv).xyz / fv.lensq();
-		return ThreeVector3(SymTwoMatrix3(getMetric3()) * fv, fdv).xyz / fv.lensq();
+		return ThreeVector3(SymTwoMatrix3(getMetric3(getFaceFlag(f))) * fv, fdv).xyz / fv.lensq();
 	}
-	const TwoVector4 fv = getFaceVector4(f);
-	const TwoVector4 fdv = getFaceDualVector4(f);
-	if(m_m.empty()) return FourVector4(fv, fdv).xyzt / fv.lensq();
-	return FourVector4(SymTwoMatrix4(getMetric4()) * fv, fdv).xyzt / fv.lensq();
+	default: {
+		const TwoVector4 fv = getFaceVector4(f);
+		const TwoVector4 fdv = getFaceDualVector4(f);
+		if(m_m.empty()) return FourVector4(fv, fdv).xyzt / fv.lensq();
+		return FourVector4(SymTwoMatrix4(getMetric4(getFaceFlag(f))) * fv, fdv).xyzt / fv.lensq();
+	}
+	}
 }
-double Mesh::getFaceHodge(const uint f, const SymTwoMatrix4 &metric) const
-{
-	if(m_dim == 2)
-	{
+double Mesh::getFaceHodge(const uint f, const SymTwoMatrix4 &metric) const {
+	switch(m_dim) {
+	case 2: {
 		const TwoVector2 fv = getFaceVector2(f);
 		const double fdv = getFaceDualVector2(f);
 		return metric.toSymTwoMatrix2().xyxy * fdv / fv.xy;
 	}
-	if(m_dim == 3)
-	{
+	case 3: {
 		const TwoVector3 fv = getFaceVector3(f);
 		const Vector3 fdv = getFaceDualVector3(f);
 		return ThreeVector3(metric.toSymTwoMatrix3() * fv, fdv).xyz / fv.lensq();
 	}
-	const TwoVector4 fv = getFaceVector4(f);
-	const TwoVector4 fdv = getFaceDualVector4(f);
-	return FourVector4(metric * fv, fdv).xyzt / fv.lensq();
+	default: {
+		const TwoVector4 fv = getFaceVector4(f);
+		const TwoVector4 fdv = getFaceDualVector4(f);
+		return FourVector4(metric * fv, fdv).xyzt / fv.lensq();
+	}
+	}
 }
 
-double Mesh::getBodyHodge(const uint b) const
-{
-	if(m_dim == 3)
-	{
+double Mesh::getBodyHodge(const uint b) const {
+	switch(m_dim) {
+	case 3: {
 		const ThreeVector3 bv = getBodyVector3(b);
 		const double bdv = getBodyDualVector3(b);
 		if(m_m.empty()) return bdv / bv.xyz;
-		return SymThreeMatrix3(getMetric3()).xyzxyz * bdv / bv.xyz;
+		return SymThreeMatrix3(getMetric3(getBodyFlag(b))).xyzxyz * bdv / bv.xyz;
 	}
-	const ThreeVector4 bv = getBodyVector4(b);
-	const Vector4 bdv = getBodyDualVector4(b);
-	if(m_m.empty()) return FourVector4(bv, bdv).xyzt / bv.lensq();
-	return FourVector4(SymThreeMatrix4(getMetric4()) * bv, bdv).xyzt / bv.lensq();
+	default: {
+		const ThreeVector4 bv = getBodyVector4(b);
+		const Vector4 bdv = getBodyDualVector4(b);
+		if(m_m.empty()) return FourVector4(bv, bdv).xyzt / bv.lensq();
+		return FourVector4(SymThreeMatrix4(getMetric4(getBodyFlag(b))) * bv, bdv).xyzt / bv.lensq();
+	}
+	}
 }
-double Mesh::getBodyHodge(const uint b, const SymThreeMatrix4 &metric) const
-{
-	if(m_dim == 3)
-	{
+double Mesh::getBodyHodge(const uint b, const SymThreeMatrix4 &metric) const {
+	switch(m_dim) {
+	case 3: {
 		const ThreeVector3 bv = getBodyVector3(b);
 		const double bdv = getBodyDualVector3(b);
 		return metric.xyzxyz * bdv / bv.xyz;
 	}
-	const ThreeVector4 bv = getBodyVector4(b);
-	const Vector4 bdv = getBodyDualVector4(b);
-	return FourVector4(metric * bv, bdv).xyzt / bv.lensq();
+	default: {
+		const ThreeVector4 bv = getBodyVector4(b);
+		const Vector4 bdv = getBodyDualVector4(b);
+		return FourVector4(metric * bv, bdv).xyzt / bv.lensq();
+	}
+	}
 }
-
-double Mesh::getQuadHodge(const uint q) const
-{
+double Mesh::getQuadHodge(const uint q) const {
 	const FourVector4 qv = getQuadVector(q);
 	const double qdv = getQuadDualVector(q);
 	if(m_m.empty()) return qdv / qv.xyzt;
-	return SymFourMatrix4(getMetric4()).xyztxyzt * qdv / qv.xyzt;
+	return SymFourMatrix4(getMetric4(getQuadFlag(q))).xyztxyzt * qdv / qv.xyzt;
 }
-double Mesh::getQuadHodge(const uint q, const SymFourMatrix4 &metric) const
-{
+double Mesh::getQuadHodge(const uint q, const SymFourMatrix4 &metric) const {
 	const FourVector4 qv = getQuadVector(q);
 	const double qdv = getQuadDualVector(q);
 	return metric.xyztxyzt * qdv / qv.xyzt;
 }
-*/
+
 Vector4 Mesh::getEdgeDeviation(const uint e, const Vector4 &p) const
 {
 	if(m_dim == 1) return Vector4(0,0,0,0);
