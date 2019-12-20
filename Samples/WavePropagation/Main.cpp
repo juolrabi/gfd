@@ -1,3 +1,9 @@
+/**
+ * A program for simulating wave propagation.
+ * The code is under construction.
+ * Author: Jukka Räbinä, University of Jyväskylä, 2019.
+ */
+
 #include "../../GFD/BlockDec/BlockMesh.hpp"
 #include "../../GFD/Output/MeshDrawer.hpp"
 #include "../../GFD/Types/Types.hpp"
@@ -151,7 +157,7 @@ int main()
 	// create a PartMesh from BlockMesh
 	PartMesh mesh(getMPIrank(), getMPIranks(), 2);
 	bm.toMesh(mesh);
-
+/*
 {
 	FormGrade grade = fg_dual1; 
 	void (*func)(const Vector4 &p, double *) = &get3;
@@ -163,42 +169,42 @@ int main()
 
 	Hodge<double> f0;
 	auto starttime = chrono::system_clock::now();
-	bm.integrateHodge(grade, func, num, f0);
+	bm.integrateHodge(func, num, grade, f0);
 	cout << "f0 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
 
 	Hodge<double> f1;
 	starttime = chrono::system_clock::now();
-	dec.integrateHodge(grade, func, num, f1);
+	dec.integrateHodge(func, num, grade, f1);
 	cout << "f1 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
 
 	Hodge<double> f2;
 	starttime = chrono::system_clock::now();
-	dec.integrateHodge(grade, UINTSETALL, func, num, f2);
+	dec.integrateHodge(func, num, grade, UINTSETALL, f2);
 	cout << "f2 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
 
 	Hodge<double> f3;
 	starttime = chrono::system_clock::now();
-	dec.integrateHodge(UINTSETALL, grade, func, num, f3);
+	dec.integrateHodge(UINTSETALL, func, num, grade, f3);
 	cout << "f3 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
 
 	Hodge<double> cf0;
 	starttime = chrono::system_clock::now();
-	bm.integrateHodge(grade, constfunc, 1, cf0);
+	bm.integrateHodge(constfunc, 1, grade, cf0);
 	cout << "cf0 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
 
 	Hodge<double> cf1;
 	starttime = chrono::system_clock::now();
-	dec.integrateConstantHodge(grade, &buf[0], cf1);
+	dec.integrateConstantHodge(&buf[0], grade, cf1);
 	cout << "cf1 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
 
 	Hodge<double> cf2;
 	starttime = chrono::system_clock::now();
-	dec.integrateConstantHodge(grade, UINTSETALL, &buf[0], cf2);
+	dec.integrateConstantHodge(&buf[0], grade, UINTSETALL, cf2);
 	cout << "cf2 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
 
 	Hodge<double> cf3;
 	starttime = chrono::system_clock::now();
-	dec.integrateConstantHodge(UINTSETALL, grade, &buf[0], cf3);
+	dec.integrateConstantHodge(UINTSETALL, &buf[0], grade, cf3);
 	cout << "cf3 time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
 
 	double summ = 0.0;
@@ -246,65 +252,12 @@ int main()
 		cout << "csum2 = " << csum2 << endl;
 		cout << "csum3 = " << csum3 << endl;
 	}
-/*
-	FormGrade hgrade = FormGradeDual(grade);
-	Form<double> f0;
-	bm.integrateForm(grade, get1, num, f0);
-	Hodge<double> h0;
-	bm.integrateHodge(grade, get1Hodge, num, h0);
-	Form<double> f1;
-	f1.setTimes(h0, f0);
-
-	//Form<double> decf1;
-	//bm.integrateForm(hgrade, get1, num, decf1);
-
-	Dec dec(mesh);
-	Form<double> decf0;
-	auto starttime = chrono::system_clock::now();
-	dec.integrateForm(grade, get1, num, decf0);
-//	dec.integrateFormBaseUp(grade, 0, 2, UINTSETALL, get1, num, decf0);
-	cout << "Elapsed time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
-	Hodge<double> dech0;
-	dec.integrateHodge(grade, get1Hodge, num, dech0);
-	Form<double> decf1;
-	decf1.setTimes(dech0, decf0);
-
-	double sum = 0.0;
-	double summ = 0.0;
-	for(uint j=0; j<f0.m_height; j++) {
-		const double val = f0.getValue(j);
-		const double dif = val - decf0.getValue(j);
-		sum += dif * dif;
-		summ += val * val;
-		//cout << mesh.getNodeHodge(j) << " " << dech0.m_val[j] << endl;
-	}
-	sumMPI(&sum, 1);
-	sumMPI(&summ, 1);
-*/
-/*	// draw f0 at the end
-	double check = 0.0;
-	Picture pic0(500,500);
-	Buffer<double> val(3, 0.0);
-	for(uint j=0; j<pic0.getHeight(); j++) {
-		for(uint i=0; i<pic0.getWidth(); i++) {
-			const Vector4 p(0.006 * i - 1.0, 0.006 * j - 1.0,0,0);
-			bm.interpolateForm(grade, f3, p, val);
-			sumMPI(&val[0], val.size());
-			const Vector4 col((val.size() > 0 ? val[0] : 0.0), (val.size() > 1 ? val[1] : 0.0), (val.size() > 2 ? val[2] : 0.0), 1.0);
-			check += col.toVector3().len();
-			pic0.setColor(i, j, col);
-		}
-	}
-	if(getMPIrank() == 0) {
-		cout << "check = " << check << endl;
-		pic0.save("kuva.bmp", true);
-	}
-*/}
+}
 
 	finalizeMPI();
 
     return 0;
-
+*/
 
 	// draw the mesh
 	MeshDrawer drawer;
@@ -325,7 +278,7 @@ int main()
 
 	// initialize forms and integrate initial solution
 	Form<double> f0;
-	bm.integrateForm(fg_prim0, get0Form, 2, f0);
+	bm.integrateForm(get0Form, 2, fg_prim0, f0);
 
 	// initialize derivatives and integrate Hodge operators
 	Derivative d0;
@@ -361,9 +314,9 @@ int main()
 	Derivative d0T;
 	d0T.setTranspose(d0);
 	Hodge<double> h1;
-	bm.integrateHodge(fg_prim1, get1Hodge, 2, h1);
+	bm.integrateHodge(get1Hodge, 2, fg_prim1, h1);
 	Hodge<double> dh0;
-	bm.integrateHodge(fg_dual0, get0Hodge, 2, dh0);
+	bm.integrateHodge(get0Hodge, 2, fg_dual0, dh0);
 	Sparse<double> delta0 = dh0 * d0T * h1;
 	Form<double> f1;
 	f1.setFullOfZeros(d0.m_height);

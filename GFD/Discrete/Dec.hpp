@@ -24,14 +24,15 @@ public:
 	void setHighDimension(const uint highdim);
 
 	Sparse<sign> &integrateDerivative(const FormGrade grade, Sparse<sign> &result) const;
-	Sparse<double> &integrateCurvatureDerivative(const FormGrade grade, const UintSet &flag, SymMatrix4 curv(const Vector4 &), Sparse<double> &result) const;
+	Sparse<sign> &integrateDerivative(const FormGrade grade, const UintSet &flag, Sparse<sign> &result) const;
+	Sparse<double> &integrateCurvatureDerivative(SymMatrix4 curv(const Vector4 &), const FormGrade grade, const UintSet &flag, Sparse<double> &result) const;
 
 	template<typename T> Column<T> &integrateZeroForm(const FormGrade grade, Column<T> &result) const {
 		MeshIntegrator intg(m_mesh, grade, 0, m_lowdim, m_highdim);
 		const uint locs = intg.getLocals();
 		initResult(locs, result);
 	}
-	template<typename T> Column<T> &integrateConstantForm(const FormGrade grade, const T *f, Column<T> &result) const {
+	template<typename T> Column<T> &integrateConstantForm(const T *f, const FormGrade grade, Column<T> &result) const {
 		MeshIntegrator intg(m_mesh, grade, 0, m_lowdim, m_highdim);
 		const uint locs = intg.getLocals();
 		initResult(locs, result);
@@ -50,7 +51,7 @@ public:
 		shareExternals(ext, extval, result.m_val);
 		return result;
 	}
-	template<typename T> Column<T> &integrateConstantForm(const FormGrade grade, const UintSet &flag, const T *f, Column<T> &result) const {
+	template<typename T> Column<T> &integrateConstantForm(const T *f, const FormGrade grade, const UintSet &flag, Column<T> &result) const {
 		MeshIntegrator intg(m_mesh, grade, 0, m_lowdim, m_highdim);
 		const uint locs = intg.getLocals();
 		initResult(locs, result);
@@ -69,7 +70,7 @@ public:
 		shareExternals(ext, extval, result.m_val);
 		return result;
 	}
-	template<typename T> Column<T> &integrateConstantForm(const UintSet &baseflag, const FormGrade grade, const T *f, Column<T> &result) const {
+	template<typename T> Column<T> &integrateConstantForm(const UintSet &baseflag, const T *f, const FormGrade grade, Column<T> &result) const {
 		MeshIntegrator intg(m_mesh, grade, 0, m_lowdim, m_highdim);
 		const uint locs = intg.getLocals();
 		initResult(locs, result);
@@ -97,7 +98,7 @@ public:
 		shareExternals(ext, extval, result.m_val);
 		return result;
 	}
-	template<typename T> Column<T> &integrateForm(const FormGrade grade, void func(const Vector4 &, T *), const uint num, Column<T> &result) const {
+	template<typename T> Column<T> &integrateForm(void func(const Vector4 &, T *), const uint num, const FormGrade grade, Column<T> &result) const {
 		MeshIntegrator intg(m_mesh, grade, num, m_lowdim, m_highdim);
 		const uint locs = intg.getLocals();
 		initResult(locs, result);
@@ -116,7 +117,7 @@ public:
 		shareExternals(ext, extval, result.m_val);
 		return result;
 	}
-	template<typename T> Column<T> &integrateForm(const FormGrade grade, const UintSet &flag, void func(const Vector4 &, T *), const uint num, Column<T> &result) const {
+	template<typename T> Column<T> &integrateForm(void func(const Vector4 &, T *), const uint num, const FormGrade grade, const UintSet &flag, Column<T> &result) const {
 		MeshIntegrator intg(m_mesh, grade, num, m_lowdim, m_highdim);
 		const uint locs = intg.getLocals();
 		initResult(locs, result);
@@ -135,7 +136,7 @@ public:
 		shareExternals(ext, extval, result.m_val);
 		return result;
 	}
-	template<typename T> Column<T> &integrateForm(const UintSet &baseflag, const FormGrade grade, void func(const Vector4 &, T *), const uint num, Column<T> &result) const {
+	template<typename T> Column<T> &integrateForm(const UintSet &baseflag, void func(const Vector4 &, T *), const uint num, const FormGrade grade, Column<T> &result) const {
 		MeshIntegrator intg(m_mesh, grade, num, m_lowdim, m_highdim);
 		const uint locs = intg.getLocals();
 		initResult(locs, result);
@@ -286,7 +287,7 @@ public:
 		}
 		return result;
 	}
-	template<typename T> Diagonal<T> &integrateConstantHodge(const FormGrade grade, const T *f, Diagonal<T> &result) const {
+	template<typename T> Diagonal<T> &integrateConstantHodge(const T *f, const FormGrade grade, Diagonal<T> &result) const {
 		const bool isprim = FormGradeIsPrim(grade);
 		MeshIntegrator intg0(m_mesh, (isprim ? grade : FormGradeDual(grade)), 0, m_lowdim, m_highdim);
 		MeshIntegrator intg1(m_mesh, (!isprim ? grade : FormGradeDual(grade)), 0, m_lowdim, m_highdim);
@@ -311,7 +312,7 @@ public:
 		}
 		return result;
 	}
-	template<typename T> Diagonal<T> &integrateConstantHodge(const FormGrade grade, const UintSet &flag, const T *f, Diagonal<T> &result) const {
+	template<typename T> Diagonal<T> &integrateConstantHodge(const T *f, const FormGrade grade, const UintSet &flag, Diagonal<T> &result) const {
 		MeshIntegrator intg0(m_mesh, grade, 0, m_lowdim, m_highdim);
 		MeshIntegrator intg1(m_mesh, FormGradeDual(grade), 0, m_lowdim, m_highdim);
 		const uint locs = intg0.getLocals();
@@ -353,7 +354,7 @@ public:
 		}
 		return result;
 	}
-	template<typename T> Diagonal<T> &integrateConstantHodge(const UintSet &baseflag, const FormGrade grade, const T *f, Diagonal<T> &result) const {
+	template<typename T> Diagonal<T> &integrateConstantHodge(const UintSet &baseflag, const T *f, const FormGrade grade, Diagonal<T> &result) const {
 		MeshIntegrator intg0(m_mesh, grade, 0, m_lowdim, m_highdim);
 		MeshIntegrator intg1(m_mesh, FormGradeDual(grade), 0, m_lowdim, m_highdim);
 		const uint locs = intg0.getLocals();
@@ -404,7 +405,7 @@ public:
 		}
 		return result;
 	}
-	template<typename T> Diagonal<T> &integrateHodge(const FormGrade grade, void func(const Vector4 &, T *), const uint num, Diagonal<T> &result) const {
+	template<typename T> Diagonal<T> &integrateHodge(void func(const Vector4 &, T *), const uint num, const FormGrade grade, Diagonal<T> &result) const {
 		const bool isprim = FormGradeIsPrim(grade);
 		MeshIntegrator intg0(m_mesh, (isprim ? grade : FormGradeDual(grade)), num, m_lowdim, m_highdim);
 		MeshIntegrator intg1(m_mesh, (!isprim ? grade : FormGradeDual(grade)), num, m_lowdim, m_highdim);
@@ -430,7 +431,7 @@ public:
 		}
 		return result;
 	}
-	template<typename T> Diagonal<T> &integrateHodge(const FormGrade grade, const UintSet &flag, void func(const Vector4 &, T *), const uint num, Diagonal<T> &result) const {
+	template<typename T> Diagonal<T> &integrateHodge(void func(const Vector4 &, T *), const uint num, const FormGrade grade, const UintSet &flag, Diagonal<T> &result) const {
 		MeshIntegrator intg0(m_mesh, grade, num, m_lowdim, m_highdim);
 		MeshIntegrator intg1(m_mesh, FormGradeDual(grade), num, m_lowdim, m_highdim);
 		const uint locs = intg0.getLocals();
@@ -473,7 +474,7 @@ public:
 		}
 		return result;
 	}
-	template<typename T> Diagonal<T> &integrateHodge(const UintSet &baseflag, const FormGrade grade, void func(const Vector4 &, T *), const uint num, Diagonal<T> &result) const {
+	template<typename T> Diagonal<T> &integrateHodge(const UintSet &baseflag, void func(const Vector4 &, T *), const uint num, const FormGrade grade, Diagonal<T> &result) const {
 		MeshIntegrator intg0(m_mesh, grade, num, m_lowdim, m_highdim);
 		MeshIntegrator intg1(m_mesh, FormGradeDual(grade), num, m_lowdim, m_highdim);
 		const uint locs = intg0.getLocals();

@@ -32,8 +32,32 @@ TwoVector3 getField(const Mesh &mesh, const Buffer<double> &val, const uint node
 	return A.inverse() * b;
 }
 
+Buffer<uint> findEdges(const uint n0, const uint n1, const uint n2, BuilderMesh &mesh) {
+	Buffer<uint> e(3);
+	e[0] = mesh.findEdge(n0, n1);
+	e[1] = mesh.findEdge(n1, n2);
+	e[2] = mesh.findEdge(n2, n0);
+	return e;
+}
+Buffer<uint> findFaces(const uint n0, const uint n1, const uint n2, const uint n3, BuilderMesh &mesh) {
+	Buffer<uint> f(4);
+	f[0] = mesh.findFace(findEdges(n0, n1, n2, mesh));
+	f[1] = mesh.findFace(findEdges(n0, n1, n3, mesh));
+	f[2] = mesh.findFace(findEdges(n0, n2, n3, mesh));
+	f[3] = mesh.findFace(findEdges(n1, n2, n3, mesh));
+	return f;
+}
+Buffer<uint> findBodies(const uint n0, const uint n1, const uint n2, const uint n3, const uint n4, BuilderMesh &mesh) {
+	Buffer<uint> b(5);
+	b[0] = mesh.findBody(findFaces(n0, n1, n2, n3, mesh));
+	b[1] = mesh.findBody(findFaces(n0, n1, n2, n4, mesh));
+	b[2] = mesh.findBody(findFaces(n0, n1, n3, n4, mesh));
+	b[3] = mesh.findBody(findFaces(n0, n2, n3, n4, mesh));
+	b[4] = mesh.findBody(findFaces(n1, n2, n3, n4, mesh));
+	return b;
+}
 uint createSpaceTimeMesh(const double h, const double dtime, const uint steps, const double slope, const bool async, BuilderMesh &mesh) {
-	uint i, j, k, l;
+	uint i, j, k, l, m;
 	const double N = 1.0 / h + 1e-5;
 	const double n = 0.4 / h + 1e-5;
 	const double SQRT3_4 = sqrt(0.75);
@@ -56,8 +80,7 @@ uint createSpaceTimeMesh(const double h, const double dtime, const uint steps, c
 	}
 
 	// create space-time mesh
-	const SymMatrix3 met(1,0,1,0,0,-1);
-	mesh.setMetric(SymMatrix4(met,0,0,0,1));
+	mesh.setMetric(SymMatrix4(1,0,1,0,0,-1,0,0,0,0));
 	for(i=0; i<=steps; i++) {
 		for(j=0; j<nodes; j++) {
 			const Vector2 x = basemesh.getNodePosition2(j);
@@ -74,66 +97,46 @@ uint createSpaceTimeMesh(const double h, const double dtime, const uint steps, c
 		mesh.addEdge(n[0], n[1]);
 	}
 	for(j=0; j<basemesh.getFaceSize(); j++) mesh.addFace(basemesh.getFaceEdges(j));
+	for(j=0; j<basemesh.getBodySize(); j++) mesh.addBody(basemesh.getBodyFaces(j));
+	Buffer<uint> nn(nodes);
+	for(k=0; k<nodes; k++) nn[k] = k;
 	for(i=1; i<=steps; i++) {
-		Buffer<uint> nn(nodes);
 		for(j=0; j<3; j++) {
-			Buffer<uint> nn(nodes);
 			for(k=0; k<nodes; k++) {
-				nn[k] = (basemesh.getNodeFlag(k) > j ? i-1 : i) * nodes + k;
-				if(basemesh.getNodeFlag(k) == j) mesh.addEdge(nn[k], nn[k] - nodes);
-			}
-			for(k=0; k<basemesh.getEdgeSize(); k++) {
-				const Buffer<uint> &n = basemesh.getEdgeNodes(k);
-				for(l=0; l<2; l++) {
-					if(basemesh.getNodeFlag(n[l]) == j) {
-						const uint n0 = nn[n[l]];
-						const uint n1 = nn[n[(l+1)%2]];
-						Buffer<uint> e(3);
-						e[0] = mesh.findEdge(n0 - nodes, n1);
-						e[1] = mesh.findEdge(n0, n0 - nodes);
-						e[2] = mesh.addEdge(n1, n0);
-						mesh.addFace(e);
-						break;
-					}
+				if(basemesh.getNodeFlag(k) != j) continue;
+				nn[k] += nodes;
+				mesh.addEdge(nn[k], nn[k] - nodes);
+				const Buffer<uint> &e = basemesh.getNodeEdges(k);
+				for(l=0; l<e.size(); l++) {
+					Buffer<uint> en = basemesh.getEdgeNodes(e[l]);
+					for(m=0; m<en.size(); m++) en[m] = nn[en[m]];
+					mesh.addEdge(en[0], en[1]);
+					mesh.addFace(findEdges(en[0], en[1], nn[k] - nodes, mesh));
 				}
-			}
-			for(k=0; k<basemesh.getFaceSize(); k++) {
-				const Buffer<uint> n = basemesh.getFaceNodes(k); // size must be 3
-				Buffer<uint> fn(4);
-				for(l=0; l<3; l++) {
-					fn[l] = nn[n[l]];
-					if(basemesh.getNodeFlag(n[l]) == j) fn[3] = fn[l] - nodes;
+				const Buffer<uint> f = basemesh.getNodeFaces(k);
+				for(l=0; l<f.size(); l++) {
+					Buffer<uint> fn = basemesh.getFaceNodes(f[l]);
+					for(m=0; m<fn.size(); m++) fn[m] = nn[fn[m]];
+					mesh.setFaceFlag(mesh.addFace(findEdges(fn[0], fn[1], fn[2], mesh)), 1);
+					mesh.addBody(findFaces(fn[0], fn[1], fn[2], nn[k] - nodes, mesh));
 				}
-				Buffer<uint> fe(6);
-				fe[0] = mesh.findEdge(fn[0], fn[1]);
-				fe[1] = mesh.findEdge(fn[1], fn[2]);
-				fe[2] = mesh.findEdge(fn[2], fn[0]);
-				fe[3] = mesh.findEdge(fn[3], fn[0]);
-				fe[4] = mesh.findEdge(fn[3], fn[1]);
-				fe[5] = mesh.findEdge(fn[3], fn[2]);
-				Buffer<uint> e(3);
-				Buffer<uint> f(4);
-				e[0] = fe[0]; e[1] = fe[3]; e[2] = fe[4];
-				f[0] = mesh.findFace(e);
-				e[0] = fe[1]; e[1] = fe[4]; e[2] = fe[5];
-				f[1] = mesh.findFace(e);
-				e[0] = fe[2]; e[1] = fe[3]; e[2] = fe[5];
-				f[2] = mesh.findFace(e);
-				e[0] = fe[0]; e[1] = fe[1]; e[2] = fe[2];
-				f[3] = mesh.addFace(e);
-				mesh.setFaceFlag(f[3], 1);
-				mesh.addBody(f);
+				const Buffer<uint> b = basemesh.getNodeBodies(k);
+				for(l=0; l<b.size(); l++) {
+					Buffer<uint> bn = basemesh.getBodyNodes(b[l]);
+					for(m=0; m<bn.size(); m++) bn[m] = nn[bn[m]];
+					mesh.addBody(findFaces(bn[0], bn[1], bn[2], bn[3], mesh));
+					mesh.addQuad(findBodies(bn[0], bn[1], bn[2], bn[3], nn[k] - nodes, mesh));
+				}
 			}
 		}
 	}
-	return 3 * basemesh.getFaceSize() + 2 * basemesh.getEdgeSize(); // return number of faces in a block
+	return basemesh.getFaceSize() + (mesh.getFaceSize() - basemesh.getFaceSize()) / steps; // return number of faces in a block
 }
 
 void drawMeshBar(const double h, const double dtime, const uint steps, const double slope, const uint picwidth = 400) {
 	BuilderMesh mesh(3);
 	createSpaceTimeMesh(h, dtime, steps, slope, false, mesh);
-	for(uint i=0; i<=steps; i++)
-	{
+	for(uint i=0; i<=steps; i++) {
 		cout << "Drawing mesh " << i << "..." << endl;
 		const double height = dtime * i;
 		Buffer<Vector3> col(mesh.getFaceSize());
@@ -159,8 +162,8 @@ void drawMeshBar(const double h, const double dtime, const uint steps, const dou
 
 void drawWave(const double h, const double dtime, const uint microsteps, const uint steps, const double slope, const uint picwidth = 400) {
 	BuilderMesh mesh(3);
-	const uint block = createSpaceTimeMesh(h, dtime, microsteps, slope, true, mesh);
-	const uint block0 = mesh.getFaceSize() - (microsteps - 1) * block;
+	const uint fblock = createSpaceTimeMesh(h, dtime, microsteps + 1, slope, true, mesh);
+	const uint nblock = microsteps * (mesh.getNodeSize() / (microsteps + 2));
 
 	// initialize values and operator
 	uint i, j, k;
@@ -168,15 +171,22 @@ void drawWave(const double h, const double dtime, const uint microsteps, const u
 	Buffer<double> val(mesh.getFaceSize(), 0.0);
 	Buffer< Buffer< pair<uint, double> > > buf(val.size());
 	for(i=0; i<val.size(); i++) {
-		if(i < block0) { // copy value from the end
+		if(i < fblock) { // copy value from the end
 			const TwoVector3 tv = mesh.getFaceVector3(i);
 			const Vector2 p = mesh.getFaceAverage3(i).toVector2() - p0;
 			const double plen = 50.0 * p.len();
-			if(plen < PI) val[i + (microsteps-1) * block] = 3.0 * (1.0 + cos(plen)) * tv.xy;
-			buf[i].push_back(pair<uint,double>(i + (microsteps-1) * block, 1.0));
+			const Buffer<uint> n = mesh.getFaceNodes(i);
+			const uint ii = mesh.findFace(findEdges(n[0] + nblock, n[1] + nblock, n[2] + nblock, mesh));
+			if(plen < PI) val[ii] = 3.0 * (1.0 + cos(plen)) * tv.xy;
+			buf[i].push_back(pair<uint,double>(ii, 1.0));
 		}
 		else if(mesh.getFaceFlag(i) == 1) { // update by a body
-			const uint body = mesh.getFaceBodies(i)[0];
+			const Buffer<uint> &ele = mesh.getFaceBodies(i);
+			uint body = ele[0];
+			for(j=1; j<ele.size(); j++) {
+				if(ele[j] < body) body = ele[j];
+			}
+			//const uint body = mesh.getFaceBodies(i)[0];
 			const double sign = -mesh.getBodyIncidence(body, i);
 			const Buffer<uint> &f = mesh.getBodyFaces(body);
 			buf[i].resize(f.size() - 1);
@@ -186,7 +196,12 @@ void drawWave(const double h, const double dtime, const uint microsteps, const u
 			}
 		}
 		else { // update by an edge
-			const uint edge = mesh.getFaceEdges(i)[0];
+			const Buffer<uint> &ele = mesh.getFaceEdges(i);
+			uint edge = ele[0];
+			for(j=1; j<ele.size(); j++) {
+				if(ele[j] < edge) edge = ele[j];
+			}
+			//const uint edge = mesh.getFaceEdges(i)[0];
 			const double sign = -mesh.getFaceIncidence(i, edge) / mesh.getFaceHodge(i);
 			const Buffer<uint> &f = mesh.getEdgeFaces(edge);
 			buf[i].resize(f.size() - 1);
@@ -200,8 +215,9 @@ void drawWave(const double h, const double dtime, const uint microsteps, const u
 	// iterate and draw fields
 	const uint node0 = mesh.findNode(Vector4(p0,0,0), 0.5 * h * h, 0, false);
 	const uint node1 = mesh.findNode(Vector4(0.7 * cos(PI/6.0), -0.7 * sin(PI/6.0),0,0), 0.5 * h * h, 0, false);
-	const double cosi = cos(slope * dtime * microsteps);
-	const double sini = sin(slope * dtime * microsteps);
+	const double z = dtime * microsteps;
+	const double cosi = cos(slope * z);
+	const double sini = sin(slope * z);
 	const Matrix4 A(cosi,sini,0,0, -sini,cosi,0,0, 0,0,1,0, 0,0,0,0);
 	Picture picture(picwidth,picwidth);
 	picture.fillColor(Vector4(-1,-1,-1,0));

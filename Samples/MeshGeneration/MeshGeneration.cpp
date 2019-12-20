@@ -1,5 +1,6 @@
 /**
- * Program for generating a mesh Delaunay-mesh with variable metric and weights
+ * Program for generating a Delaunay-mesh with variable metric and weights.
+ * This sample is under construction.
  * Author: Jukka Räbinä, University of Jyväskylä, 2019.
  */
 

@@ -4,7 +4,7 @@ BUILD = build
 LIB := ../../GFD
 
 # c++ compiler and compiler flags
-CXX = mpicxx
+CXX = g++
 CXXFLAGS := -g -Wall -Wextra -pedantic -std=c++11
 
 
@@ -13,7 +13,7 @@ MKDIR_P ?= mkdir -p
 RMDIR_R ?= $(RM) -r
 
 # source files for the program
-SOURCES := Main.cpp $(wildcard $(LIB)/Types/*.cpp) $(wildcard $(LIB)/Mesh/*.cpp) $(wildcard $(LIB)/Output/*.cpp) $(wildcard $(LIB)/Discrete/*.cpp)
+SOURCES := Main.cpp $(filter-out $(LIB)/Types/MpiEasy.cpp, $(wildcard $(LIB)/Types/*.cpp)) $(wildcard $(LIB)/Mesh/*.cpp) $(wildcard $(LIB)/Output/*.cpp)
 OBJECTS := $(addprefix $(BUILD)/,$(patsubst %.cpp,%.o,$(patsubst $(LIB)/%,%,$(SOURCES))))
 
 # general part of makefile

@@ -102,7 +102,7 @@ public:
 
 	void toMesh(PartMesh &mesh) const;
 	Sparse<sign> &integrateDerivative(const FormGrade grade, Sparse<sign> &d) const;
-	template<typename T> Column<T> &integrateForm(const FormGrade grade, void func(const Vector4 &, T *), const uint num, Column<T> &result) const {
+	template<typename T> Column<T> &integrateForm(void func(const Vector4 &, T *), const uint num, const FormGrade grade, Column<T> &result) const {
 		// initialize form
 		const uint gdim = FormGradeDimension(grade);
 		const uint locs = getLocals(gdim);
@@ -115,7 +115,7 @@ public:
 		clearMap(blocks);
 		return result;
 	}
-	template<typename T> Diagonal<T> &integrateHodge(const FormGrade grade, void func(const Vector4 &, T *), const uint num, Diagonal<T> &result) const {
+	template<typename T> Diagonal<T> &integrateHodge(void func(const Vector4 &, T *), const uint num, const FormGrade grade, Diagonal<T> &result) const {
 		// initialize form
 		const uint gdim = FormGradeDimension(grade);
 		const uint locs = getLocals(gdim);
