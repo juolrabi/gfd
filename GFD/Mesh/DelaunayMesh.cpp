@@ -743,8 +743,8 @@ bool DelaunayMesh::insertMesh(const DelaunayMesh &mesh) {
 	CellSet detached;
 	uint rems = 0;
 	Buffer<uint> rem;
-	if(m_dim == 1)
-	{
+	switch(m_dim) {
+	case 1: {
 		Buffer<char> boun(getNodeSize(), 0);
 		for(i=0; i<nn.size(); i++)
 		{
@@ -776,9 +776,9 @@ bool DelaunayMesh::insertMesh(const DelaunayMesh &mesh) {
 			detachEdge(rem[i], detached);
 		}
 		for(i=0; i<boun.size(); i++) { if(boun[i] < 0) detachNode(i, detached); } // remove recursively interior
+		break;
 	}
-	else if(m_dim == 2)
-	{
+	case 2: {
 		Buffer<char> boun(getEdgeSize(), 0);
 		for(i=0; i<ee.size(); i++)
 		{
@@ -810,9 +810,9 @@ bool DelaunayMesh::insertMesh(const DelaunayMesh &mesh) {
 			detachFace(rem[i], detached);
 		}
 		for(i=0; i<boun.size(); i++) { if(boun[i] < 0) detachEdgeRecursive(i, detached); } // remove recursively interior
+		break;
 	}
-	else if(m_dim == 3)
-	{
+	case 3: {
 		Buffer<char> boun(getFaceSize(), 0);
 		for(i=0; i<ff.size(); i++)
 		{
@@ -843,9 +843,9 @@ bool DelaunayMesh::insertMesh(const DelaunayMesh &mesh) {
 			detachBody(rem[i], detached);
 		}
 		for(i=0; i<boun.size(); i++) { if(boun[i] < 0) detachFaceRecursive(i, detached); } // remove recursively interior
+		break;
 	}
-	else // m_dim = 4
-	{
+	default: {
 		Buffer<char> boun(getBodySize(), 0);
 		for(i=0; i<bb.size(); i++)
 		{
@@ -877,6 +877,8 @@ bool DelaunayMesh::insertMesh(const DelaunayMesh &mesh) {
 			detachQuad(rem[i], detached);
 		}
 		for(i=0; i<boun.size(); i++) { if(boun[i] < 0) detachBodyRecursive(i, detached); } // remove recursively interior
+		break;
+	}
 	}
 
 	// add missing cells
@@ -1415,7 +1417,7 @@ uint DelaunayMesh::mergeQuad(const uint q, CellSet &detached) {
 
 		if(!isInsideSphere(qp, qsq, getQuadNodes(otherq))) continue;
 
-		// merge body ->
+		// merge quad ->
 		Buffer<uint> otherqb = m_q[otherq].b;
 		for(j=otherqb.size(); j-->0; ) {
 			if(b.gatherOrUngather(otherqb[j], bs)) { // insert otherqb[j] to the boundary of q
@@ -1446,20 +1448,24 @@ Vector4 DelaunayMesh::getNodeAverage(const Buffer<uint> &n) const {
 }
 
 double DelaunayMesh::getLengthSq(const Vector4 &p, const uint node) const {
-	if(m_dim == 1) {
+	switch(m_dim) {
+	case 1: {
 		const double r = p.x - getNodePosition1(node);
 		return r * getTransformed1(r, 0);
 	}
-	if(m_dim == 2) {
+	case 2: {
 		const Vector2 r = p.toVector2() - getNodePosition2(node);
 		return r.dot(getTransformed2(r, 0));
 	}
-	if(m_dim == 3) {
+	case 3: {
 		const Vector3 r = p.toVector3() - getNodePosition3(node);
 		return r.dot(getTransformed3(r, 0));
 	}
-	const Vector4 r = p - getNodePosition4(node);
-	return r.dot(getTransformed4(r, 0));
+	default: {
+		const Vector4 r = p - getNodePosition4(node);
+		return r.dot(getTransformed4(r, 0));
+	}
+	}
 }
 
 double DelaunayMesh::getRadiusSq(const Vector4 &p, const uint node) const {

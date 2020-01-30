@@ -12,8 +12,7 @@ PartMesh::PartMesh(const uint part, const uint parts, const uint dim)
 	m_parts = parts;
 }
 
-void PartMesh::clear()
-{
+void PartMesh::clear() {
 	Mesh::clear();
 
 	m_extn.clear();
@@ -69,8 +68,7 @@ bool PartMesh::saveJRMeshMore(std::ofstream &fs) const {
 	return true;
 }
 
-void PartMesh::createPartFromFlags(const Mesh &mesh)
-{
+void PartMesh::createPartFromFlags(const Mesh &mesh) {
 	uint i, j;
 
 	const uint nsize = mesh.getNodeSize();
@@ -367,8 +365,7 @@ void PartMesh::createPart(const Mesh &mesh, const Buffer<uint> &npart,
 }
 
 
-void PartMesh::createCombined(Buffer<const PartMesh *> &mesh)
-{
+void PartMesh::createCombined(Buffer<const PartMesh *> &mesh) {
 	uint i, j, k, exts;
 	clear();
 

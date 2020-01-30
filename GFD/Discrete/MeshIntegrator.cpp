@@ -2,7 +2,7 @@
 
 using namespace gfd;
 
-MeshIntegrator::MeshIntegrator(const PartMesh &mesh, const FormGrade grade, const uint num, const uint lowdim, const uint highdim)
+MeshIntegrator::MeshIntegrator(const PartMesh &mesh, const FormGrade grade, const int num, const uint lowdim, const uint highdim)
  : m_mesh(mesh) {
 	m_grade = grade;
 	m_num = num;
@@ -10,15 +10,17 @@ MeshIntegrator::MeshIntegrator(const PartMesh &mesh, const FormGrade grade, cons
 	m_highdim = (highdim < 4 ? highdim : 4);
 }
 
-uint MeshIntegrator::getFields() const { 
+Quadrature MeshIntegrator::getEmptyQuadrature() const { 
 	const uint dim = m_mesh.getDimension();
-	switch (FormGradeDimension(m_grade)) {
-	case 1: return dim;
-	case 2: return dim * (dim - 1) / 2;
-	case 3: return dim * (dim - 1) * (dim - 2) / 6;
-	default: return 1;
-	}
+	const uint num = uint(abs(m_num));
+	if(num < 2) return Quadrature(FormGradeVectorDimension(m_grade, dim), dim, num);
+	const uint gdim = FormGradeDimension(m_grade);
+	const uint ddim = (FormGradeIsPrim(m_grade) ? gdim - m_lowdim : m_highdim - gdim);
+	uint pcount = 1;
+	for(uint n=0; n<ddim; n++) pcount = (pcount * (n + num)) / (n + 1);
+	return Quadrature(FormGradeVectorDimension(m_grade, dim), dim, pcount); 
 }
+
 uint MeshIntegrator::getLocals(const uint gdim) const {
 	switch (gdim) {
 	case 0: return m_mesh.getNodeLocals();
@@ -137,15 +139,15 @@ template<typename V> void MeshIntegrator::removeExternalVectors(const uint locs,
 		v.pop_back();
 	}
 }
-template<typename V> Buffer<double> &MeshIntegrator::createEntryQuadrature(const uint pdim, const Buffer<Vector4> &p, V vector(const Vector4 *), Buffer<double> &q) const {
+template<typename V> Quadrature &MeshIntegrator::createEntryQuadrature(const uint pdim, const Buffer<Vector4> &p, V vector(const Vector4 *), Quadrature &q) const {
 	const uint elems = p.size() / pdim;
 	if(elems == 0) return q;
 	uint vs = 0;
-	Buffer<double> v(elems * getFields());
-	for(uint i=0; i<elems; i++) setVector(vector(&p[pdim * i]), v, vs);
-	return createMultiQuadrature(elems, p, v, q);
+	Quadrature v(q.vdim(),q.pdim(),0, elems);
+	for(uint i=0; i<elems; i++) v.push(vector(&p[pdim * i]), vs);
+	return createMultiQuadrature(p, v, q);
 }
-template<typename V, typename B> Buffer<double> &MeshIntegrator::createQuadrature(const Buffer<uint> &j, const Buffer<Vector4> &p, V vector(const Vector4 *, const B &), B base(const PartMesh &, const uint), Buffer<double> &q) const {
+template<typename V, typename B> Quadrature &MeshIntegrator::createQuadrature(const Buffer<uint> &j, const Buffer<Vector4> &p, V vector(const Vector4 *, const B &), B base(const PartMesh &, const uint), Quadrature &q) const {
 	const uint elems = j.size();
 	if(elems == 0) return q;
 	const uint pdim = p.size() / elems;
@@ -164,11 +166,11 @@ template<typename V, typename B> Buffer<double> &MeshIntegrator::createQuadratur
 	}
 	// compute quadrature
 	uint vs = 0;
-	Buffer<double> v(elems * getFields());
-	for(uint i=0; i<elems; i++) setVector(vector(&p[pdim * i], b[link[i]]), v, vs);
-	return createMultiQuadrature(elems, p, v, q);
+	Quadrature v(q.vdim(), q.pdim(), 0, elems);
+	for(uint i=0; i<elems; i++) v.push(vector(&p[pdim * i], b[link[i]]), vs);
+	return createMultiQuadrature(p, v, q);
 }
-template<typename V, typename B> Buffer< pair<uint, Buffer<double> > > &MeshIntegrator::createBaseQuadrature(const Buffer<uint> &j, const Buffer<Vector4> &p, V vector(const Vector4 *, const B &), const B &b, Buffer< pair<uint, Buffer<double> > > &q) const {
+template<typename V, typename B> Buffer< pair<uint,Quadrature> > &MeshIntegrator::createBaseQuadrature(const Buffer<uint> &j, const Buffer<Vector4> &p, V vector(const Vector4 *, const B &), const B &b, Buffer< pair<uint,Quadrature> > &q) const {
 	const uint elems = j.size();
 	if(elems == 0) return q;
 	const uint pdim = p.size() / elems;
@@ -177,8 +179,8 @@ template<typename V, typename B> Buffer< pair<uint, Buffer<double> > > &MeshInte
 	Buffer<uint> qj(elems);
 	for(uint i=0; i<elems; i++) qj.gatherOnce(j[i], qjs);
 	// compute quadratures for each group
-	const uint fields = getFields();
 	q.resize(qjs);
+	const Quadrature q0(getEmptyQuadrature());
 	for(uint i=0; i<qjs; i++) {
 		uint size = 0;
 		for(uint k=0; k<elems; k++) {
@@ -187,15 +189,16 @@ template<typename V, typename B> Buffer< pair<uint, Buffer<double> > > &MeshInte
 		uint ps = 0;
 		Buffer<Vector4> pi(size * pdim);
 		uint vs = 0;
-		Buffer<double> vi(size * fields);
+		Quadrature vi(q0.vdim(), q0.pdim(), 0, size);
 		for(uint k=0; k<elems; k++) {
 			if(j[k] != qj[i]) continue;
 			const Vector4 *pk = &p[pdim * k];
 			for(uint l=0; l<pdim; l++) pi[ps++] = pk[l];
-			setVector(vector(pk, b), vi, vs);
+			vi.push(vector(pk, b), vs);
 		}
 		q[i].first = qj[i];
-		createMultiQuadrature(size, pi, vi, q[i].second);
+		q[i].second = q0;
+		createMultiQuadrature(pi, vi, q[i].second);
 	}
 	return q;
 }
@@ -204,15 +207,15 @@ void initZero(Vector4 &v) { v = Vector4(0,0,0,0); }
 void initZero(TwoVector4 &v) { v = TwoVector4(0,0,0,0,0,0); }
 void initZero(ThreeVector4 &v) { v = ThreeVector4(0,0,0,0); }
 void initZero(FourVector4 &v) { v = FourVector4(0); }
-template<typename V, typename B, typename R> Buffer<double> &MeshIntegrator::createVector(const Buffer<uint> &j, const Buffer<V> &v, R vector(const V &, const B &), B base(const PartMesh &, const uint), Buffer<double> &q) const {
+template<typename V, typename B, typename R> Quadrature &MeshIntegrator::createVector(const Buffer<uint> &j, const Buffer<V> &v, R vector(const V &, const B &), B base(const PartMesh &, const uint), Quadrature &q) const {
 	R res;
 	initZero(res);
 	for(uint i=0; i<j.size(); i++) res += vector(v[i], base(m_mesh, j[i])); 
 	return createSingleVector(res, q);
 }
-Buffer<double> &MeshIntegrator::getVector(const uint i, Buffer<double> &q) const {
+Quadrature &MeshIntegrator::getVector(const uint i, Quadrature &q) const {
 	Buffer<uint> j;
-	q.clear();
+	q = getEmptyQuadrature();
 	switch (m_grade) {
 	case fg_prim0: {
 		switch (m_lowdim) {
@@ -371,22 +374,23 @@ Buffer<double> &MeshIntegrator::getVector(const uint i, Buffer<double> &q) const
 	default: return q;
 	}
 }
-template<typename V, typename B, typename R> Buffer< pair<uint, Buffer<double> > > &MeshIntegrator::createBaseVector(const Buffer<uint> &j, const Buffer<V> &v, R vector(const V &, const B &), const B &b, Buffer< pair<uint, Buffer<double> > > &q) const {
+template<typename V, typename B, typename R> Buffer< pair<uint,Quadrature> > &MeshIntegrator::createBaseVector(const Buffer<uint> &j, const Buffer<V> &v, R vector(const V &, const B &), const B &b, Buffer< pair<uint,Quadrature> > &q) const {
 	q.resize(j.size());
 	for(uint i=0; i<q.size(); i++) {
 		q[i].first = j[i];
+		q[i].second = getEmptyQuadrature();
 		createSingleVector(vector(v[i], b), q[i].second); 
 	}
 	return q;
 }
-Buffer< pair<uint, Buffer<double> > > &MeshIntegrator::getBaseVector(const uint i, Buffer< pair<uint, Buffer<double> > > &q) const {
+Buffer< pair<uint,Quadrature> > &MeshIntegrator::getBaseVector(const uint i, Buffer< pair<uint,Quadrature> > &q) const {
 	Buffer<uint> j;
 	q.clear();
 	switch (m_grade) {
 	case fg_prim0: {
 		switch (m_lowdim) {
 		case 0: {
-			if(i >= m_mesh.getNodeLocals()) return q;
+			//if(i >= m_mesh.getNodeLocals()) return q;
 			return createSingleBaseVector(i, 1.0, q);
 		}
 		default: return q;
@@ -423,11 +427,11 @@ Buffer< pair<uint, Buffer<double> > > &MeshIntegrator::getBaseVector(const uint 
 		case 0: {
 			Buffer<Vector4> v;
 			m_mesh.getNodeEdgeVectors(i, j, v);
-			removeExternalVectors(m_mesh.getEdgeLocals(), j, v);
+			//removeExternalVectors(m_mesh.getEdgeLocals(), j, v);
 			return createBaseVector(j, v, vectorEdgeNode, 1.0, q);
 		}
 		case 1: {
-			if(i >= m_mesh.getEdgeLocals()) return q;
+			//if(i >= m_mesh.getEdgeLocals()) return q;
 			return createSingleBaseVector(i, unitEdge(m_mesh, i), q);
 		}
 		default: return q;
@@ -459,17 +463,17 @@ Buffer< pair<uint, Buffer<double> > > &MeshIntegrator::getBaseVector(const uint 
 		case 0: {
 			Buffer<TwoVector4> v;
 			m_mesh.getNodeFaceVectors(i, j, v);
-			removeExternalVectors(m_mesh.getFaceLocals(), j, v);
+			//removeExternalVectors(m_mesh.getFaceLocals(), j, v);
 			return createBaseVector(j, v, vectorFaceNode, 1.0, q);
 		}
 		case 1: {
 			Buffer<Vector4> v;
 			m_mesh.getEdgeFaceVectors(i, j, v);
-			removeExternalVectors(m_mesh.getFaceLocals(), j, v);
+			//removeExternalVectors(m_mesh.getFaceLocals(), j, v);
 			return createBaseVector(j, v, vectorFaceEdge, unitEdge(m_mesh, i), q);
 		}
 		case 2: {
-			if(i >= m_mesh.getFaceLocals()) return q;
+			//if(i >= m_mesh.getFaceLocals()) return q;
 			return createSingleBaseVector(i, unitFace(m_mesh, i), q);
 		}
 		default: return q;
@@ -496,23 +500,23 @@ Buffer< pair<uint, Buffer<double> > > &MeshIntegrator::getBaseVector(const uint 
 		case 0: {
 			Buffer<ThreeVector4> v;
 			m_mesh.getNodeBodyVectors(i, j, v);
-			removeExternalVectors(m_mesh.getBodyLocals(), j, v);
+			//removeExternalVectors(m_mesh.getBodyLocals(), j, v);
 			return createBaseVector(j, v, vectorBodyNode, 1.0, q);
 		}
 		case 1: {
 			Buffer<TwoVector4> v;
 			m_mesh.getEdgeBodyVectors(i, j, v);
-			removeExternalVectors(m_mesh.getBodyLocals(), j, v);
+			//removeExternalVectors(m_mesh.getBodyLocals(), j, v);
 			return createBaseVector(j, v, vectorBodyEdge, unitEdge(m_mesh, i), q);
 		}
 		case 2: {
 			Buffer<Vector4> v;
 			m_mesh.getFaceBodyVectors(i, j, v);
-			removeExternalVectors(m_mesh.getBodyLocals(), j, v);
+			//removeExternalVectors(m_mesh.getBodyLocals(), j, v);
 			return createBaseVector(j, v, vectorBodyFace, unitFace(m_mesh, i), q);
 		}
 		case 3: {
-			if(i >= m_mesh.getBodyLocals()) return q;
+			//if(i >= m_mesh.getBodyLocals()) return q;
 			return createSingleBaseVector(i, unitBody(m_mesh, i), q);
 		}
 		default: return q;
@@ -534,29 +538,29 @@ Buffer< pair<uint, Buffer<double> > > &MeshIntegrator::getBaseVector(const uint 
 		case 0: {
 			Buffer<FourVector4> v;
 			m_mesh.getNodeQuadVectors(i, j, v);
-			removeExternalVectors(m_mesh.getQuadLocals(), j, v);
+			//removeExternalVectors(m_mesh.getQuadLocals(), j, v);
 			return createBaseVector(j, v, vectorQuadNode, 1.0, q);
 		}
 		case 1: {
 			Buffer<ThreeVector4> v;
 			m_mesh.getEdgeQuadVectors(i, j, v);
-			removeExternalVectors(m_mesh.getQuadLocals(), j, v);
+			//removeExternalVectors(m_mesh.getQuadLocals(), j, v);
 			return createBaseVector(j, v, vectorQuadEdge, unitEdge(m_mesh, i), q);
 		}
 		case 2: {
 			Buffer<TwoVector4> v;
 			m_mesh.getFaceQuadVectors(i, j, v);
-			removeExternalVectors(m_mesh.getQuadLocals(), j, v);
+			//removeExternalVectors(m_mesh.getQuadLocals(), j, v);
 			return createBaseVector(j, v, vectorQuadFace, unitFace(m_mesh, i), q);
 		}
 		case 3: {
 			Buffer<Vector4> v;
 			m_mesh.getBodyQuadVectors(i, j, v);
-			removeExternalVectors(m_mesh.getQuadLocals(), j, v);
+			//removeExternalVectors(m_mesh.getQuadLocals(), j, v);
 			return createBaseVector(j, v, vectorQuadBody, unitBody(m_mesh, i), q);
 		}
 		case 4: {
-			if(i >= m_mesh.getQuadLocals()) return q;
+			//if(i >= m_mesh.getQuadLocals()) return q;
 			return createSingleBaseVector(i, unitQuad(m_mesh, i), q);
 		}
 		default: return q;
@@ -571,10 +575,11 @@ Buffer< pair<uint, Buffer<double> > > &MeshIntegrator::getBaseVector(const uint 
 	default: return q;
 	}
 }
-Buffer<double> &MeshIntegrator::getQuadrature(const uint i, Buffer<double> &q) const {
+Quadrature &MeshIntegrator::getQuadrature(const uint i, Quadrature &q) const {
+	if(m_num == 0) return getVector(i, q);
 	Buffer<Vector4> p;
 	Buffer<uint> j;
-	q.clear();
+	q = getEmptyQuadrature();
 	switch (m_grade) {
 	case fg_prim0: {
 		switch (m_lowdim) {
@@ -614,7 +619,8 @@ Buffer<double> &MeshIntegrator::getQuadrature(const uint i, Buffer<double> &q) c
 	case fg_prim1: {
 		switch (m_lowdim) {
 		case 0: {
-			m_mesh.getEdgeSimplices(i, p);
+			if(m_num > 0) m_mesh.getEdgeSimplices(i, p);
+			else m_mesh.getEdgeNodeSimplices(i, j, p);
 			return createEntryQuadrature(2, p, vectorEdge, q);
 		}
 		case 1: return createSingleQuadrature(m_mesh.getEdgePosition(i), unitEdge(m_mesh, i), q);
@@ -648,7 +654,8 @@ Buffer<double> &MeshIntegrator::getQuadrature(const uint i, Buffer<double> &q) c
 	case fg_prim2: {
 		switch (m_lowdim) {
 		case 0: {
-			m_mesh.getFaceSimplices(i, p);
+			if(m_num > 0) m_mesh.getFaceSimplices(i, p);
+			else m_mesh.getFaceNodeSimplices(i, j, p);
 			return createEntryQuadrature(3, p, vectorFace, q);
 		}
 		case 1: {
@@ -681,7 +688,8 @@ Buffer<double> &MeshIntegrator::getQuadrature(const uint i, Buffer<double> &q) c
 	case fg_prim3: {
 		switch (m_lowdim) {
 		case 0: {
-			m_mesh.getBodySimplices(i, p);
+			if(m_num > 0) m_mesh.getBodySimplices(i, p);
+			else m_mesh.getBodyNodeSimplices(i, j, p);
 			return createEntryQuadrature(4, p, vectorBody, q);
 		}
 		case 1: {
@@ -713,7 +721,8 @@ Buffer<double> &MeshIntegrator::getQuadrature(const uint i, Buffer<double> &q) c
 	case fg_prim4: {
 		switch (m_lowdim) {
 		case 0: {
-			m_mesh.getQuadSimplices(i, p);
+			if(m_num > 0) m_mesh.getQuadSimplices(i, p);
+			else m_mesh.getQuadNodeSimplices(i, j, p);
 			return createEntryQuadrature(5, p, vectorQuad, q);
 		}
 		case 1: {
@@ -745,7 +754,8 @@ Buffer<double> &MeshIntegrator::getQuadrature(const uint i, Buffer<double> &q) c
 	}
 }
 
-Buffer< pair<uint, Buffer<double> > > &MeshIntegrator::getBaseQuadrature(const uint i, Buffer< pair<uint, Buffer<double> > > &q) const {
+Buffer< pair<uint,Quadrature> > &MeshIntegrator::getBaseQuadrature(const uint i, Buffer< pair<uint,Quadrature> > &q) const {
+	if(m_num == 0) return getBaseVector(i, q);
 	Buffer<Vector4> p;
 	Buffer<uint> j;
 	q.clear();
@@ -753,7 +763,7 @@ Buffer< pair<uint, Buffer<double> > > &MeshIntegrator::getBaseQuadrature(const u
 	case fg_prim0: {
 		switch (m_lowdim) {
 		case 0: {
-			if(i >= m_mesh.getNodeLocals()) return q;
+			//if(i >= m_mesh.getNodeLocals()) return q;
 			return createSingleBaseQuadrature(i, m_mesh.getNodePosition(i), 1.0, q);
 		}
 		default: return q;
@@ -785,11 +795,11 @@ Buffer< pair<uint, Buffer<double> > > &MeshIntegrator::getBaseQuadrature(const u
 		switch (m_lowdim) {
 		case 0: {
 			m_mesh.getNodeEdgeSimplices(i, j, p);
-			removeExternalSimplices(m_mesh.getEdgeLocals(), j, p);
+			//removeExternalSimplices(m_mesh.getEdgeLocals(), j, p);
 			return createBaseQuadrature(j, p, vectorEdgeNode, 1.0, q);
 		}
 		case 1: {
-			if(i >= m_mesh.getEdgeLocals()) return q;
+			//if(i >= m_mesh.getEdgeLocals()) return q;
 			return createSingleBaseQuadrature(i, m_mesh.getEdgePosition(i), unitEdge(m_mesh, i), q);
 		}
 		default: return q;
@@ -818,16 +828,16 @@ Buffer< pair<uint, Buffer<double> > > &MeshIntegrator::getBaseQuadrature(const u
 		switch (m_lowdim) {
 		case 0: {
 			m_mesh.getNodeFaceSimplices(i, j, p);
-			removeExternalSimplices(m_mesh.getFaceLocals(), j, p);
+			//removeExternalSimplices(m_mesh.getFaceLocals(), j, p);
 			return createBaseQuadrature(j, p, vectorFaceNode, 1.0, q);
 		}
 		case 1: {
 			m_mesh.getEdgeFaceSimplices(i, j, p);
-			removeExternalSimplices(m_mesh.getFaceLocals(), j, p);
+			//removeExternalSimplices(m_mesh.getFaceLocals(), j, p);
 			return createBaseQuadrature(j, p, vectorFaceEdge, unitEdge(m_mesh, i), q);
 		}
 		case 2: {
-			if(i >= m_mesh.getFaceLocals()) return q;
+			//if(i >= m_mesh.getFaceLocals()) return q;
 			return createSingleBaseQuadrature(i, m_mesh.getFacePosition(i), unitFace(m_mesh, i), q);
 		}
 		default: return q;
@@ -851,21 +861,21 @@ Buffer< pair<uint, Buffer<double> > > &MeshIntegrator::getBaseQuadrature(const u
 		switch (m_lowdim) {
 		case 0: {
 			m_mesh.getNodeBodySimplices(i, j, p);
-			removeExternalSimplices(m_mesh.getBodyLocals(), j, p);
+			//removeExternalSimplices(m_mesh.getBodyLocals(), j, p);
 			return createBaseQuadrature(j, p, vectorBodyNode, 1.0, q);
 		}
 		case 1: {
 			m_mesh.getEdgeBodySimplices(i, j, p);
-			removeExternalSimplices(m_mesh.getBodyLocals(), j, p);
+			//removeExternalSimplices(m_mesh.getBodyLocals(), j, p);
 			return createBaseQuadrature(j, p, vectorBodyEdge, unitEdge(m_mesh, i), q);
 		}
 		case 2: {
 			m_mesh.getFaceBodySimplices(i, j, p);
-			removeExternalSimplices(m_mesh.getBodyLocals(), j, p);
+			//removeExternalSimplices(m_mesh.getBodyLocals(), j, p);
 			return createBaseQuadrature(j, p, vectorBodyFace, unitFace(m_mesh, i), q);
 		}
 		case 3: {
-			if(i >= m_mesh.getBodyLocals()) return q;
+			//if(i >= m_mesh.getBodyLocals()) return q;
 			return createSingleBaseQuadrature(i, m_mesh.getBodyPosition(i), unitBody(m_mesh, i), q);
 		}
 		default: return q;
@@ -885,26 +895,26 @@ Buffer< pair<uint, Buffer<double> > > &MeshIntegrator::getBaseQuadrature(const u
 		switch (m_lowdim) {
 		case 0: {
 			m_mesh.getNodeQuadSimplices(i, j, p);
-			removeExternalSimplices(m_mesh.getQuadLocals(), j, p);
+			//removeExternalSimplices(m_mesh.getQuadLocals(), j, p);
 			return createBaseQuadrature(j, p, vectorQuadNode, 1.0, q);
 		}
 		case 1: {
 			m_mesh.getEdgeQuadSimplices(i, j, p);
-			removeExternalSimplices(m_mesh.getQuadLocals(), j, p);
+			//removeExternalSimplices(m_mesh.getQuadLocals(), j, p);
 			return createBaseQuadrature(j, p, vectorQuadEdge, unitEdge(m_mesh, i), q);
 		}
 		case 2: {
 			m_mesh.getFaceQuadSimplices(i, j, p);
-			removeExternalSimplices(m_mesh.getQuadLocals(), j, p);
+			//removeExternalSimplices(m_mesh.getQuadLocals(), j, p);
 			return createBaseQuadrature(j, p, vectorQuadFace, unitFace(m_mesh, i), q);
 		}
 		case 3: {
 			m_mesh.getBodyQuadSimplices(i, j, p);
-			removeExternalSimplices(m_mesh.getQuadLocals(), j, p);
+			//removeExternalSimplices(m_mesh.getQuadLocals(), j, p);
 			return createBaseQuadrature(j, p, vectorQuadBody, unitBody(m_mesh, i), q);
 		}
 		case 4: {
-			if(i >= m_mesh.getQuadLocals()) return q;
+			//if(i >= m_mesh.getQuadLocals()) return q;
 			return createSingleBaseQuadrature(i, m_mesh.getQuadPosition(i), unitQuad(m_mesh, i), q);
 		}
 		default: return q;
@@ -920,78 +930,42 @@ Buffer< pair<uint, Buffer<double> > > &MeshIntegrator::getBaseQuadrature(const u
 	}
 }
 
-Buffer<double> &MeshIntegrator::invertVector(Buffer<double> &q) const {
-	uint i;
-	// compute square of the vector
-	double sq = 0.0;
-	for(i=0; i<q.size(); i++) sq += q[i] * q[i];
-	if(sq == 0.0) return q;
-	// rescale vector 
-	const double div = 1.0 / sq;
-	for(i=0; i<q.size(); i++) q[i] *= div;
-	return q;
-}
-Buffer<double> &MeshIntegrator::invertQuadrature(const Vector4 &p, Buffer<double> &q) const {
-	uint i, j;
-	const uint dim = m_mesh.getDimension();
-	const uint fields = getFields();
-	const uint size = dim + fields;
-	// move positions and sum up vectors
-	Buffer<double> v(fields, 0.0);
-	for(i=0; i<q.size(); i+=size) {
-		q[i] -= p.x;
-		if(dim >= 2) q[i+1] -= p.y;
-		if(dim >= 3) q[i+2] -= p.z;
-		if(dim >= 4) q[i+3] -= p.t;
-		const double *qi = &q[i + dim];
-		for(j=0; j<fields; j++) v[j] += qi[j];
-	}
-	// compute square of summed vector
-	double sq = 0.0;
-	for(j=0; j<fields; j++) sq += v[j] * v[j];
-	if(sq == 0.0) return q;
-	// rescale vectors
-	const double div = 1.0 / sq;
-	for(i=dim; i<q.size(); i+=size) {
-		double *qi = &q[i];
-		for(j=0; j<fields; j++) qi[j] *= div;
-	}
-	return q;
-}
-template<typename V> Buffer<double> &MeshIntegrator::createSingleVector(const V &v, Buffer<double> &q) const {
+template<typename V> Quadrature &MeshIntegrator::createSingleVector(const V &v, Quadrature &q) const {
 	uint qs = 0;
-	q.resize(getFields());
-	setVector(v, q, qs);
+	q.reserve(1);
+	q.push(v, qs);
 	return q;
 }
-template<typename V> Buffer< pair<uint, Buffer<double> > > &MeshIntegrator::createSingleBaseVector(const uint i, const V &v, Buffer< pair<uint, Buffer<double> > > &q) const {
+template<typename V> Buffer< pair<uint,Quadrature> > &MeshIntegrator::createSingleBaseVector(const uint i, const V &v, Buffer< pair<uint,Quadrature> > &q) const {
 	q.resize(1);
 	q[0].first = i;
+	q[0].second = getEmptyQuadrature();
 	createSingleVector(v, q[0].second);
 	return q;
 }
-template<typename V> Buffer<double> &MeshIntegrator::createSingleQuadrature(const Vector4 &p, const V &v, Buffer<double> &q) const {
+template<typename V> Quadrature &MeshIntegrator::createSingleQuadrature(const Vector4 &p, const V &v, Quadrature &q) const {
 	uint qs = 0;
-	q.resize(m_mesh.getDimension() + getFields());
-	setVector(p, q, qs);
-	setVector(v, q, qs);
+	q.reserve(1);
+	q.push(v, qs);
+	q.push(p, qs);
 	return q;
 }
-template<typename V> Buffer< pair<uint, Buffer<double> > > &MeshIntegrator::createSingleBaseQuadrature(const uint i, const Vector4 &p, const V &v, Buffer< pair<uint, Buffer<double> > > &q) const {
+template<typename V> Buffer< pair<uint,Quadrature> > &MeshIntegrator::createSingleBaseQuadrature(const uint i, const Vector4 &p, const V &v, Buffer< pair<uint,Quadrature> > &q) const {
 	q.resize(1);
 	q[0].first = i;
+	q[0].second = getEmptyQuadrature();
 	createSingleQuadrature(p, v, q[0].second);
 	return q;
 }
 
-Buffer<double> &MeshIntegrator::createMultiQuadrature(const uint elems, const Buffer<Vector4> &p, const Buffer<double> &v, Buffer<double> &q) const {
+Quadrature &MeshIntegrator::createMultiQuadrature(const Buffer<Vector4> &p, const Quadrature &v, Quadrature &q) const {
 	uint i, j, n;
 	uint qs = 0;
+	const uint elems = v.vcount();
+	const uint vdim = v.vdim();
 	const uint pdim = p.size() / elems;
-	const uint vdim = v.size() / elems;
-	const uint qdim = m_mesh.getDimension() + vdim;
 	switch (m_num) {
-	case 0: { // compress simplices into one average point
+	case 1: { // compress simplices into one average point
 		Buffer<double> sumv(vdim, 0.0);
 		for(i=0; i<elems; i++) {
 			const double *vi = &v[vdim * i];
@@ -1008,33 +982,30 @@ Buffer<double> &MeshIntegrator::createMultiQuadrature(const uint elems, const Bu
 		double sumsq = 0.0;
 		for(n=0; n<vdim; n++) sumsq += sumv[n] * sumv[n];
 		sump /= double(pdim) * sumsq;
-		q.resize(qdim);
-		setVector(sump, q, qs);
-		for(n=0; n<vdim; n++) q[qs++] = sumv[n];
+		q.reserve(1);
+		q.push(sumv, qs);
+		q.push(sump, qs);
 		return q;
 	}
-	case 1: { // use one average point per simplex
-		q.resize(qdim * elems);
+	case -1: { // use one average point per simplex
+		q.reserve(elems);
 		for(i=0; i<elems; i++) {
+			q.push(&v[vdim * i], vdim, qs);
 			const Vector4 *pi = &p[pdim * i];
 			Vector4 sump(0,0,0,0);
 			for(n=0; n<pdim; n++) sump += pi[n];
 			sump /= double(pdim);
-			setVector(sump, q, qs);
-			const double *vi = &v[vdim * i];
-			for(n=0; n<vdim; n++) q[qs++] = vi[n];
+			q.push(sump, qs);
 		}
 		return q;
 	}
 	default: { // use several average points for the quadrature
-		const double a = 1.0 / sqrt((m_num - 1) * (m_num + pdim - 1));
-		const double b = (1.0 / a - double(m_num - 1)) / double(pdim);
-		uint num = 1;
-		for(n=1; n<pdim; n++) num = (num * (m_num + n - 1)) / n;
-		const double c = 1.0 / double(num);
-		Buffer<double> cvi(vdim);
+		const uint num = uint(abs(m_num));
+		const double a = 1.0 / sqrt((num - 1) * (num + pdim - 1));
+		const double b = (1.0 / a - double(num - 1)) / double(pdim);
 		Buffer<Vector4> di(pdim - 1);
-		q.resize(qdim * elems * num);
+		const double c = 1.0 / double(q.pcount());
+		q.reserve(elems);
 		for(i=0; i<elems; i++) {
 			const Vector4 *pi = &p[pdim * i];
 			Vector4 p0 = pi[0];
@@ -1043,36 +1014,31 @@ Buffer<double> &MeshIntegrator::createMultiQuadrature(const uint elems, const Bu
 				p0 += b * di[n-1];
 			}
 			const double *vi = &v[vdim * i];
-			for(n=0; n<vdim; n++) cvi[n] = c * vi[n];
+			for(n=0; n<vdim; n++) q.push(c * vi[n], qs);
 			if(pdim == 1) {
-				setVector(p0, q, qs);
-				for(n=0; n<vdim; n++) q[qs++] = cvi[n];
+				q.push(p0, qs);
 				continue;
 			}
-			for(j=0; j<m_num; j++) {
+			for(j=0; j<num; j++) {
 				const Vector4 p1 = p0 + j * di[0];
 				if(pdim == 2) {
-					setVector(p1, q, qs);
-					for(n=0; n<vdim; n++) q[qs++] = cvi[n];
+					q.push(p1, qs);
 					continue;
 				}
-				for(uint k=j; k<m_num; k++) {
+				for(uint k=j; k<num; k++) {
 					const Vector4 p2 = p1 + (k - j) * di[1];
 					if(pdim == 3) {
-						setVector(p2, q, qs);
-						for(n=0; n<vdim; n++) q[qs++] = cvi[n];
+						q.push(p2, qs);
 						continue;
 					}
-					for(uint l=k; l<m_num; l++) {
+					for(uint l=k; l<num; l++) {
 						const Vector4 p3 = p2 + (l - k) * di[2];
 						if(pdim == 4) {
-							setVector(p3, q, qs);
-							for(n=0; n<vdim; n++) q[qs++] = cvi[n];
+							q.push(p3, qs);
 							continue;
 						}
-						for(uint m=l; m<m_num; m++) {
-							setVector(p3 + (m - l) * di[3], q, qs);
-							for(n=0; n<vdim; n++) q[qs++] = cvi[n];
+						for(uint m=l; m<num; m++) {
+							q.push(p3 + (m - l) * di[3], qs);
 						}
 					}
 				}
@@ -1083,38 +1049,4 @@ Buffer<double> &MeshIntegrator::createMultiQuadrature(const uint elems, const Bu
 	}
 }
 
-void MeshIntegrator::setVector(const double &v, Buffer<double> &q, uint &qs) const {
-	q[qs++] = v;
-}
-void MeshIntegrator::setVector(const Vector4 &v, Buffer<double> &q, uint &qs) const {
-	const uint dim = m_mesh.getDimension();
-	q[qs++] = v.x;
-	if(dim == 1) return;
-	q[qs++] = v.y;
-	if(dim == 2) return;
-	q[qs++] = v.z;
-	if(dim == 3) return;
-	q[qs++] = v.t;
-}
-void MeshIntegrator::setVector(const TwoVector4 &v, Buffer<double> &q, uint &qs) const {
-	const uint dim = m_mesh.getDimension();
-	q[qs++] = v.xy;
-	if(dim == 2) return;
-	q[qs++] = v.xz;
-	q[qs++] = v.yz;
-	if(dim == 3) return;
-	q[qs++] = v.xt;
-	q[qs++] = v.yt;
-	q[qs++] = v.zt;
-}
-void MeshIntegrator::setVector(const ThreeVector4 &v, Buffer<double> &q, uint &qs) const {
-	q[qs++] = v.xyz;
-	if(m_mesh.getDimension() == 3) return;
-	q[qs++] = v.xyt;
-	q[qs++] = v.xzt;
-	q[qs++] = v.yzt;
-}
-void MeshIntegrator::setVector(const FourVector4 &v, Buffer<double> &q, uint &qs) const {
-	q[qs++] = v.xyzt;
-}
 

@@ -14,28 +14,28 @@ namespace gfd
 {
 
 template<typename T>
-class Column : public Discrete<T>
+class Column : public Diagonal<T>
 {
 public:
 	// constructors
-	Column(const T &zero = 0) : Discrete<T>::Discrete(zero) { } // initialize empty column vector
-	template<typename R> Column(const Column<R> &r) : Discrete<T>::Discrete(r.m_zero) { setCopy(r); } // copy existing column vector
-	Column(const uint height, const T &zero) : Discrete<T>::Discrete(zero) { setFullOfZeros(height); } // initialize full column vector with given height
-	Column(const Buffer<T> &val, const T &zero) : Discrete<T>::Discrete(zero) { setFull(val); } // initialize full column vector
-	Column(const uint height, const Buffer< pair<uint, T> > &val, const T &zero) : Discrete<T>::Discrete(zero) { setSparse(height, val); } // initialize sparse column vector
+	Column(const T &zero = 0) : Diagonal<T>::Diagonal(zero) { } // initialize empty column vector
+	template<typename R> Column(const Diagonal<R> &r) : Diagonal<T>::Diagonal(r) { } // copy existing column vector
+	Column(const uint height, const T &zero) : Diagonal<T>::Diagonal(height, zero) { } // initialize full column vector with given height
+	Column(const Buffer<T> &val, const T &zero) : Diagonal<T>::Diagonal(val, zero) { } // initialize full column vector
+	Column(const uint height, const Buffer< pair<uint, T> > &val, const T &zero) : Diagonal<T>::Diagonal(height, val, zero) { } // initialize sparse column vector
 	virtual ~Column() { }
 
 	// print functions
 	void printData() const {
 		cout << "Column vector:" << endl;
-		Discrete<T>::printVectorData();
+		Discrete<T>::printData();
 	}
 	void printShape() const {
 		uint i, k;
 		Column data(this->m_zero);
 		const uint ranks = getMPIranks();
 		for(k=0; k<ranks; k++) {
-			Discrete<T>::getVectorFromRank(k, 0, data);
+			Discrete<T>::getFromRank(k, 0, data);
 			for(i=0; i<data.m_height; i++) {
 				uint row = i;
 				if(!data.m_full && !data.searchIndex(row, data.m_row, 0, data.m_row.size())) cout << "." << endl;
@@ -45,16 +45,20 @@ public:
 	}
 
 	// set functions
-	Column &setFullOfZeros(const uint height) { Discrete<T>::setVectorFullOfZeros(height); return *this; }
-	Column &setFull(const Buffer<T> &val) { Discrete<T>::setVectorFull(val); return *this; }
-	Column &setSparse(const uint height, const Buffer< pair<uint, T> > &val) { Discrete<T>::setVectorSparse(height, val); return *this; }
-	template<typename R> Column &setCopy(const Column<R> &r) { Discrete<T>::setVectorCopy(r); return *this; }
-	template<typename R> Column &setNegation(const Column<R> &r) { Discrete<T>::setVectorNegation(r); return *this; }
-	template<typename L, typename R> Column &setPlus(const Column<L> &l, const Column<R> &r) { Discrete<T>::setVectorPlus(l, r); return *this; }
-	template<typename L, typename R> Column &setMinus(const Column<L> &l, const Column<R> &r) { Discrete<T>::setVectorMinus(l, r); return *this; }
-	template<typename L, typename R> Column &setTimes(const Diagonal<L> &l, const Column<R> &r) { Discrete<T>::setVectorTimes(l, r); return *this; }
-	template<typename L, typename R> Column &setTimes(const Sparse<L> &l, const Column<R> &r) {
-		if(orMPI(l.m_width != r.m_height)) { Discrete<T>::setVectorEmpty(); return *this; } // the dimensions do not match
+	Column &setFullOfZeros(const uint height) { Discrete<T>::setFullOfZeros(height); return *this; }
+	Column &setFull(const Buffer<T> &val) { Discrete<T>::setFull(val); return *this; }
+	Column &setSparse(const uint height, const Buffer< pair<uint, T> > &val = Buffer< pair<uint, T> >()) { Discrete<T>::setSparse(height, val); return *this; }
+	template<typename R> Column &setCopy(const Diagonal<R> &r) { Discrete<T>::setCopy(r); return *this; }
+	template<typename R> Column &setFunction(const Diagonal<R> &r, T func(const R &)) { Discrete<T>::setFunction(r, func); return *this; }
+	template<typename R> Column &setNegation(const Diagonal<R> &r) { Discrete<T>::setNegation(r); return *this; }
+	template<typename R> Column &setInverse(const Diagonal<R> &r) { Discrete<T>::setInverse(r); return *this; }
+	template<typename L, typename R> Column &setUnion(const Diagonal<L> &l, const Diagonal<R> &r, T func(const L &, const R &)) { Discrete<T>::setUnion(l, r, func); return *this; }
+	template<typename L, typename R> Column &setIntersection(const Diagonal<L> &l, const Diagonal<R> &r, T func(const L &, const R &)) { Discrete<T>::setIntersection(l, r, func); return *this; }
+	template<typename L, typename R> Column &setPlus(const Diagonal<L> &l, const Diagonal<R> &r) { Discrete<T>::setPlus(l, r); return *this; }
+	template<typename L, typename R> Column &setMinus(const Diagonal<L> &l, const Diagonal<R> &r) { Discrete<T>::setMinus(l, r); return *this; }
+	template<typename L, typename R> Column &setTimes(const Diagonal<L> &l, const Diagonal<R> &r) { Discrete<T>::setTimes(l, r); return *this; }
+	template<typename L, typename R> Column &setTimes(const Sparse<L> &l, const Diagonal<R> &r) {
+		if(orMPI(l.m_width != r.m_height)) { Discrete<T>::setEmpty(); return *this; } // the dimensions do not match
 		uint i, j, k, n;
 		Buffer<T> val(l.m_beg.size(), this->m_zero);
 		if(r.m_full) {
@@ -133,24 +137,18 @@ public:
 		this->m_val.swap(val);
 		return *this;
 	}
-	template<typename L, typename R> Column &setScaleRight(const Column<L> &l, const R &r) { Discrete<T>::setVectorScaleRight(l, r); return *this; }
-	template<typename L, typename R> Column &setScaleLeft(const L &l, const Column<R> &r) { Discrete<T>::setVectorScaleLeft(l, r); return *this; }
-
+	template<typename L, typename R> Column &setScale(const Diagonal<L> &l, const R &r) { Discrete<T>::setScale(l, r); return *this; }
+	template<typename L, typename R> Column &setScale(const L &l, const Diagonal<R> &r) { Discrete<T>::setScale(l, r); return *this; }
 
 	// modifier functions
-	template<typename R> Column &operator+=(const Column<R> &r) { return setPlus(*this, r); }
-	template<typename R> Column &operator-=(const Column<R> &r) { return setMinus(*this, r); }
-	template<typename R> Column &scaleRight(const R &r) { return setScaleRight(*this, r); }
-	template<typename L> Column &scaleLeft(const L &l) { return setScaleLeft(l, *this); }
+	template<typename R> Column &operator+=(const Diagonal<R> &r) { return setPlus(*this, r); }
+	template<typename R> Column &operator-=(const Diagonal<R> &r) { return setMinus(*this, r); }
+	template<typename R> Column &scale(const R &r) { return setScale(*this, r); }
 
 	// trim functions
-	Column &trimFull() { Discrete<T>::trimVectorFull(); return *this; } // convert sparse to full
-	Column &trimSparse() { Discrete<T>::trimVectorSparse(); return *this; } // convert full to sparse
-	Column &trim() { Discrete<T>::trimVector(); return *this; } // remove all zero instances
-
-	// get functions
-	Buffer<T> getBuffer() const { return Discrete<T>::getVectorBuffer(); } // return vector values in the format of Buffer<T>
-	const T &getValue(const uint i) const { return Discrete<T>::getVectorValue(i); }
+	Column &trimFull() { Discrete<T>::trimFull(); return *this; } // convert sparse to full
+	Column &trimSparse() { Discrete<T>::trimSparse(); return *this; } // convert full to sparse
+	Column &trim() { Discrete<T>::trim(); return *this; } // remove all zero instances
 
 };
 
@@ -170,6 +168,14 @@ template<typename L, typename R, typename O = decltype(declval<L &>() * declval<
 template<typename L, typename R, typename O = decltype(declval<L &>() * declval<R &>())> Column<O> operator*(const Sparse<L> &l, const Column<R> &r) {
 	Column<O> o(l.m_zero * r.m_zero);
 	return o.setTimes(l, r);
+}
+template<typename L, typename R, typename O = decltype(declval<L &>() * declval<R &>())> Column<O> scaled(const Column<L> &l, const R &r) {
+	Column<O> o(l.m_zero * r);
+	return o.setScale(l, r);
+}
+template<typename L, typename R, typename O = decltype(declval<L &>() * declval<R &>())> Column<O> scaled(const L &l, const Column<R> &r) {
+	Column<O> o(l * r.m_zero);
+	return o.setScale(l, r);
 }
 template<typename R> Column<R> operator-(const Column<R> &r) {
 	Column<R> o(r.m_zero);

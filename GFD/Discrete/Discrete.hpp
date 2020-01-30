@@ -14,10 +14,14 @@ using namespace std;
 
 namespace gfd {
 
-template<typename T,typename L,typename R> void functionPlus(T &res, const L &l, const R &r) { res = l + r; }
-template<typename T,typename L,typename R> void functionMinus(T &res, const L &l, const R &r) { res = l - r; }
-template<typename T,typename L,typename R> void functionReversePlus(T &res, const R &r, const L &l) { res = l + r; }
-template<typename T,typename L,typename R> void functionReverseMinus(T &res, const R &r, const L &l) { res = l - r; }
+template<typename T,typename R> T functionNegation(const R &r) { return -r; }
+template<typename T,typename R> T functionInverse(const R &r) { return 1.0 / r; }
+template<typename T,typename L,typename R> T functionPlus(const L &l, const R &r) { return l + r; }
+template<typename T,typename L,typename R> T functionMinus(const L &l, const R &r) { return l - r; }
+template<typename T,typename L,typename R> T functionTimes(const L &l, const R &r) { return l * r; }
+template<typename T,typename L,typename R> T functionDividedBy(const L &l, const R &r) { return l / r; }
+template<typename T,typename L,typename R> T functionReversePlus(const R &r, const L &l) { return l + r; }
+template<typename T,typename L,typename R> T functionReverseMinus(const R &r, const L &l) { return l - r; }
 
 template<typename T>
 class Discrete
@@ -45,7 +49,7 @@ public:
 	Buffer<T> m_val; // term values
 
 protected:
-	void printVectorData() const {
+	void printData() const {
 		uint i;
 		cout << "m_height = " << m_height << endl;
 		cout << "m_full = " << m_full << endl;
@@ -56,10 +60,10 @@ protected:
 		for(i=0; i<m_val.size(); i++) cout << " " << m_val[i];
 		cout << endl;
 	}
-	void getVectorFromRank(const uint from, const uint to, Discrete &recv) const {
+	void getFromRank(const uint from, const uint to, Discrete &recv) const {
 		if(getMPIrank() == from) {
 			if(getMPIrank() == to) {
-				recv.setVectorCopy(*this);
+				recv.setCopy(*this);
 				return;
 			}
 			Discrete send(*this);
@@ -86,14 +90,14 @@ protected:
 			if(isize > 0) recvMPI(&recv.m_val[0], isize * sizeof(T), from, 0);
 		}
 	}
-	Discrete &setVectorEmpty() {
+	Discrete &setEmpty() {
 		m_height = 0;
 		m_full = true;
 		m_row.clear();
 		m_val.clear();
 		return *this;
 	}
-	Discrete &setVectorFullOfZeros(const uint height) {
+	Discrete &setFullOfZeros(const uint height) {
 		m_height = height;
 		m_full = true;
 		m_row.clear();
@@ -101,14 +105,14 @@ protected:
 		m_val.fill(m_zero);
 		return *this;
 	}
-	Discrete &setVectorFull(const Buffer<T> &val) {
+	Discrete &setFull(const Buffer<T> &val) {
 		m_height = val.size();
 		m_full = true;
 		m_row.clear();
 		m_val = val;
 		return *this;
 	}
-	Discrete &setVectorSparse(const uint height, const Buffer< pair<uint, T> > &val) {
+	Discrete &setSparse(const uint height, const Buffer< pair<uint, T> > &val) {
 		m_height = height;
 		m_full = false;
 		const Buffer<uint> ord = bubbleSort(val);
@@ -120,25 +124,25 @@ protected:
 		}
 		return *this;
 	}
-	template<typename R> Discrete &setVectorShape(const Discrete<R> &r) {
+	template<typename R> Discrete &setShape(const Discrete<R> &r) {
 		m_height = r.m_height;
 		m_full = r.m_full;
 		m_row = r.m_row;
 		m_val.resize(r.m_val.size());
 		return *this;
 	}
-	template<typename R> Discrete &setVectorCopy(const Discrete<R> &r) {
-		setVectorShape(r);
+	template<typename R> Discrete &setCopy(const Discrete<R> &r) {
+		setShape(r);
 		for(uint i=0; i<m_val.size(); i++) m_val[i] = r.m_val[i];
 		return *this;
 	}
-	template<typename L, typename R> Discrete &setVectorUnion(const Discrete<L> &l, const Discrete<R> &r, void (*func)(T &, const L &, const R &)) {
-		if(orMPI(l.m_height != r.m_height)) return setVectorEmpty(); // the heights do not match
+	template<typename L, typename R> Discrete &setUnion(const Discrete<L> &l, const Discrete<R> &r, T func(const L &, const R &)) {
+		if(orMPI(l.m_height != r.m_height)) return setEmpty(); // the heights do not match
 		uint i = 0;
 		if(l.m_full) {
 			if(r.m_full) { // both l and r are full column vectors
-				if(this != (void*)&l && this != (void*)&r) setVectorShape(l);
-				for(i=0; i<l.m_height; i++) func(m_val[i], l.m_val[i], r.m_val[i]);
+				if(this != (void*)&l && this != (void*)&r) setShape(l);
+				for(i=0; i<l.m_height; i++) m_val[i] = func(l.m_val[i], r.m_val[i]);
 				return *this;
 			}
 			// only l is a full column vector
@@ -146,20 +150,20 @@ protected:
 			if(this == &r) {
 				Buffer<T> val(l.m_height);
 				while(ri < r.m_row.size()) {
-					while(i < r.m_row[ri]) { func(val[i], l.m_val[i], r.m_zero); i++; }
-					func(val[i], l.m_val[i], r.m_val[ri]); i++; ri++;
+					while(i < r.m_row[ri]) { val[i] = func(l.m_val[i], r.m_zero); i++; }
+					val[i] = func(l.m_val[i], r.m_val[ri]); i++; ri++;
 				}
-				while(i < l.m_height) { func(val[i], l.m_val[i], r.m_zero); i++; }
+				while(i < l.m_height) { val[i] = func(l.m_val[i], r.m_zero); i++; }
 				m_val.swap(val);
-				setVectorShape(l);
+				setShape(l);
 			}
 			else {
-				if(this != (void*)&l) setVectorShape(l);
+				if(this != (void*)&l) setShape(l);
 				while(ri < r.m_row.size()) {
-					while(i < r.m_row[ri]) { func(m_val[i], l.m_val[i], r.m_zero); i++; }
-					func(m_val[i], l.m_val[i], r.m_val[ri]); i++; ri++;
+					while(i < r.m_row[ri]) { m_val[i] = func(l.m_val[i], r.m_zero); i++; }
+					m_val[i] = func(l.m_val[i], r.m_val[ri]); i++; ri++;
 				}
-				while(i < l.m_height) { func(m_val[i], l.m_val[i], r.m_zero); i++; }
+				while(i < l.m_height) { m_val[i] = func(l.m_val[i], r.m_zero); i++; }
 			}
 			return *this;
 		}
@@ -168,20 +172,20 @@ protected:
 			if(this == &l) {
 				Buffer<T> val(r.m_height);
 				while(li < l.m_row.size()) {
-					while(i < l.m_row[li]) { func(val[i], l.m_zero, r.m_val[i]); i++; }
-					func(val[i], l.m_val[li], r.m_val[i]); i++; li++;
+					while(i < l.m_row[li]) { val[i] = func(l.m_zero, r.m_val[i]); i++; }
+					val[i] = func(l.m_val[li], r.m_val[i]); i++; li++;
 				}
-				while(i < r.m_height) { func(val[i], l.m_zero, r.m_val[i]); i++; }
+				while(i < r.m_height) { val[i] = func(l.m_zero, r.m_val[i]); i++; }
 				m_val.swap(val);
-				setVectorShape(r);
+				setShape(r);
 			}
 			else {
-				if(this != (void*)&r) setVectorShape(r);
+				if(this != (void*)&r) setShape(r);
 				while(li < l.m_row.size()) {
-					while(i < l.m_row[li]) { func(m_val[i], l.m_zero, r.m_val[i]); i++; }
-					func(m_val[i], l.m_val[li], r.m_val[i]); i++; li++;
+					while(i < l.m_row[li]) { m_val[i] = func(l.m_zero, r.m_val[i]); i++; }
+					m_val[i] = func(l.m_val[li], r.m_val[i]); i++; li++;
 				}
-				while(i < r.m_height) { func(m_val[i], l.m_zero, r.m_val[i]); i++; }
+				while(i < r.m_height) { m_val[i] = func(l.m_zero, r.m_val[i]); i++; }
 			}
 			return *this;
 		}
@@ -195,28 +199,28 @@ protected:
 		while(li < l.m_row.size() && ri < r.m_row.size()) {
 			if(l.m_row[li] < r.m_row[ri]) {
 				row[i] = l.m_row[li];
-				func(val[i], l.m_val[li], r.m_zero);
+				val[i] = func(l.m_val[li], r.m_zero);
 				i++; li++;
 			}
 			else if(r.m_row[ri] < l.m_row[li]) {
 				row[i] = r.m_row[ri];
-				func(val[i], l.m_zero, r.m_val[ri]);
+				val[i] = func(l.m_zero, r.m_val[ri]);
 				i++; ri++;
 			}
 			else {
 				row[i] = l.m_row[li];
-				func(val[i], l.m_val[li], r.m_val[ri]);
+				val[i] = func(l.m_val[li], r.m_val[ri]);
 				i++; li++; ri++;
 			}
 		}
 		while(li < l.m_row.size()) {
 			row[i] = l.m_row[li];
-			func(val[i], l.m_val[li], r.m_zero);
+			val[i] = func(l.m_val[li], r.m_zero);
 			i++; li++;
 		}
 		while(ri < r.m_row.size()) {
 			row[i] = r.m_row[ri];
-			func(val[i], l.m_zero, r.m_val[ri]);
+			val[i] = func(l.m_zero, r.m_val[ri]);
 			i++; ri++;
 		}
 		m_full = false;
@@ -225,30 +229,30 @@ protected:
 		m_val.copy(val, i);
 		return *this;
 	}
-	template<typename L, typename R> Discrete &setVectorPlus(const Discrete<L> &l, const Discrete<R> &r) {
-		return setVectorUnion(l, r, functionPlus);
+	template<typename L, typename R> Discrete &setPlus(const Discrete<L> &l, const Discrete<R> &r) {
+		return setUnion(l, r, functionPlus);
 	}
-	template<typename L, typename R> Discrete &setVectorMinus(const Discrete<L> &l, const Discrete<R> &r) {
-		return setVectorUnion(l, r, functionMinus);
+	template<typename L, typename R> Discrete &setMinus(const Discrete<L> &l, const Discrete<R> &r) {
+		return setUnion(l, r, functionMinus);
 	}
-	template<typename L, typename R> Discrete &setVectorTimes(const Discrete<L> &l, const Discrete<R> &r) {
-		if(orMPI(l.m_height != r.m_height)) return setVectorEmpty(); // the heights do not match
+	template<typename L, typename R> Discrete &setIntersection(const Discrete<L> &l, const Discrete<R> &r, T func(const L &, const R &)) {
+		if(orMPI(l.m_height != r.m_height)) return setEmpty(); // the heights do not match
 		uint i, j, k;
 		if(l.m_full) {
-			if(this != (void*)&l && this != (void*)&r) setVectorShape(r);
+			if(this != (void*)&l && this != (void*)&r) setShape(r);
 			if(r.m_full) { // both l and r are full column vectors
-				for(i=0; i<m_height; i++) m_val[i] = l.m_val[i] * r.m_val[i];
+				for(i=0; i<m_height; i++) m_val[i] = func(l.m_val[i], r.m_val[i]);
 				return *this;
 			}
 			// only l is a full column vector
-			for(i=0; i<r.m_row.size(); i++) m_val[i] = l.m_val[r.m_row[i]] * r.m_val[i];
-			if(this == &l) setVectorShape(r);
+			for(i=0; i<r.m_row.size(); i++) m_val[i] = func(l.m_val[r.m_row[i]], r.m_val[i]);
+			if(this == (void*)&l) setShape(r);
 			return *this;
 		}
-		if(this != (void*)&l && this != (void*)&r) setVectorShape(l);
+		if(this != (void*)&l && this != (void*)&r) setShape(l);
 		if(r.m_full) { // only r is a full column vector
-			for(i=0; i<l.m_row.size(); i++) m_val[i] = l.m_val[i] * r.m_val[l.m_row[i]];
-			if(this == &r) setVectorShape(l);
+			for(i=0; i<l.m_row.size(); i++) m_val[i] = func(l.m_val[i], r.m_val[l.m_row[i]]);
+			if(this == (void*)&r) setShape(l);
 			return *this;
 		}
 		// both l and r are sparse column vectors
@@ -256,30 +260,35 @@ protected:
 			while(j < r.m_row.size() && r.m_row[j] < l.m_row[i]) j++;
 			if(j < r.m_row.size() && r.m_row[j] == l.m_row[i]) {
 				m_row[k] = l.m_row[i];
-				m_val[k++] = l.m_val[i] * r.m_val[j];
+				m_val[k++] = func(l.m_val[i], r.m_val[j]);
 			}
 		}
 		m_row.resize(k);
 		m_val.resize(k);
 		return *this;
 	}
-	template<typename L, typename R> Discrete &setVectorScaleRight(const Discrete<L> &l, const R &r) {
-		if(this != (void*)&l) setVectorShape(l);
+	template<typename L, typename R> Discrete &setTimes(const Discrete<L> &l, const Discrete<R> &r) {
+		return setIntersection(l, r, functionTimes);
+	}
+	template<typename L, typename R> Discrete &setScale(const Discrete<L> &l, const R &r) {
+		if(this != (void*)&l) setShape(l);
 		for(uint i=0; i<m_val.size(); i++) m_val[i] = l.m_val[i] * r;
 		return *this;
 	}
-	template<typename L, typename R> Discrete &setVectorScaleLeft(const L &l, const Discrete<R> &r) {
-		if(this != (void*)&r) setVectorShape(r);
+	template<typename L, typename R> Discrete &setScale(const L &l, const Discrete<R> &r) {
+		if(this != (void*)&r) setShape(r);
 		for(uint i=0; i<m_val.size(); i++) m_val[i] = l * r.m_val[i];
 		return *this;
 	}
-	Discrete &setVectorNegation(const Discrete &r) {
-		if(this != (void*)&r) setVectorShape(r);
-		for(uint i=0; i<m_val.size(); i++) m_val[i] = -r.m_val[i];
+	template<typename R> Discrete &setFunction(const Discrete<R> &r, T func(const R &)) {
+		if(this != (void*)&r) setShape(r);
+		for(uint i=0; i<m_val.size(); i++) m_val[i] = func(r.m_val[i]);
 		return *this;
 	}
+	template<typename R> Discrete &setNegation(const Discrete<R> &r) { return setFunction(r, functionNegation); }
+	template<typename R> Discrete &setInverse(const Discrete<R> &r) { return setFunction(r, functionInverse); }
 
-	Discrete &trimVectorFull() { // convert sparse vector to full vector
+	Discrete &trimFull() { // convert sparse vector to full vector
 		if(m_full) return *this; // already full
 		m_full = true;
 		Buffer<T> val(m_height, m_zero);
@@ -288,14 +297,14 @@ protected:
 		m_row.clear();
 		return *this;
 	}
-	Discrete &trimVectorSparse() { // convert full vector to sparse vector
-		if(!m_full) return trimVector(); // already sparse
+	Discrete &trimSparse() { // convert full vector to sparse vector
+		if(!m_full) return trim(); // already sparse
 		m_full = false;
 		m_row.resize(m_height);
 		for(uint i=0; i<m_height; i++) m_row[i] = i;
-		return trimVector();
+		return trim();
 	}
-	Discrete &trimVector() { // remove all zero instances from a sparse column vector
+	Discrete &trim() { // remove all zero instances from a sparse column vector
 		if(m_full) return *this; // not sparse
 		uint i, j;
 		for(i=0,j=0; i<m_row.size(); i++) {
@@ -311,14 +320,14 @@ protected:
 		return *this;
 	}
 
-	const T &getVectorValue(uint i) const {
+	const T &getValue(uint i) const {
 		if(m_full) {
 			if(i >= m_val.size()) return m_zero;
 		}
 		else if(!searchIndex(i, m_row, 0, m_row.size())) return m_zero;
 		return m_val[i];
 	}
-	Buffer<T> getVectorBuffer() const {
+	Buffer<T> getBuffer() const {
 		if(m_full) return m_val;
 		Buffer<T> val(m_height, m_zero);
 		for(uint i=0; i<m_row.size(); i++) val[m_row[i]] = m_val[i];

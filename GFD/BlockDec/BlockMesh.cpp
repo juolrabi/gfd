@@ -1824,7 +1824,7 @@ void BlockMesh::addQuadToMesh(Mesh &mesh, const PartMesh *part, const uint q, co
 	mesh.addQuad(b);
 }
 
-void BlockMesh::createFormIntegrator(const FormGrade grade, map<Type, BlockIntegrator*> &blocks, const uint num) const
+void BlockMesh::createFormIntegrator(const FormGrade grade, map<Type, BlockIntegrator*> &blocks, const int num) const
 {
 	PartMesh mesh(0, PARTS, m_dim);
 	Buffer<const PartMesh *> part(m_part.size());
@@ -1849,26 +1849,8 @@ void BlockMesh::createFormIntegrator(const FormGrade grade, map<Type, BlockInteg
 			}
 		}
 	}
-
-/*	PartMesh mesh(0, PARTS, m_dim);
-	auto it = m_part[3].begin();
-	while(it != m_part[3].end())
-	{
-		const Type type = it->first;
-		Buffer<const PartMesh *> part(4);
-		part[0] = m_part[0].find(Type(type.get()))->second;
-		part[1] = m_part[1].find(Type(type.get(), type.get1()))->second;
-		part[2] = m_part[2].find(Type(type.get(), type.get10()))->second;
-		part[3] = it->second;
-		mesh.createCombined(part);
-
-		BlockIntegrator *block = new BlockIntegrator();
-		block->init(grade, mesh, num);
-		blocks.insert(make_pair(Type(type.get(),type.get1(),type.get10(),type.get11()), block));
-		it++;
-	}
-*/}
-void BlockMesh::createWedgeIntegrator(const FormGrade grade, map<Type, BlockIntegrator*> &blocks, const uint num) const
+}
+void BlockMesh::createWedgeIntegrator(const FormGrade grade, map<Type, BlockIntegrator*> &blocks, const int num) const
 {
 	PartMesh mesh(0, PARTS, m_dim);
 	Buffer<const PartMesh *> part(m_part.size());
@@ -1893,25 +1875,7 @@ void BlockMesh::createWedgeIntegrator(const FormGrade grade, map<Type, BlockInte
 			}
 		}
 	}
-
-/*	PartMesh mesh(0, PARTS, m_dim);
-	auto it = m_part[3].begin();
-	while(it != m_part[3].end())
-	{
-		const Type type = it->first;
-		Buffer<const PartMesh *> part(4);
-		part[0] = m_part[0].find(Type(type.get()))->second;
-		part[1] = m_part[1].find(Type(type.get(), type.get1()))->second;
-		part[2] = m_part[2].find(Type(type.get(), type.get10()))->second;
-		part[3] = it->second;
-		mesh.createCombined(part);
-
-		BlockIntegrator *block = new BlockIntegrator();
-		block->initWedge(grade, mesh, num);
-		blocks.insert(make_pair(Type(type.get(),type.get1(),type.get10(),type.get11()), block));
-		it++;
-	}
-*/}
+}
 void BlockMesh::createInterpolator(const FormGrade grade)
 {
 	if(!m_poly[grade].empty()) return;
@@ -1940,11 +1904,11 @@ void BlockMesh::createInterpolator(const FormGrade grade)
 		}
 	}
 }
-
-uint BlockMesh::getVectors(const FormGrade grade, Buffer<double> &result) const
+/*
+uint BlockMesh::integrateVectors(const FormGrade grade, Buffer<double> &result) const
 {
 	// initialize result
-	const uint fields = BlockIntegrator::getFieldDimension(grade, m_dim);
+	const uint fields = FormGradeVectorDimension(grade, m_dim);
 	const uint gdim = FormGradeDimension(grade);
 	const uint locs = getLocals(gdim);
 	if(result.size() != fields * locs) {
@@ -1974,7 +1938,7 @@ uint BlockMesh::getVectors(const FormGrade grade, Buffer<double> &result) const
 					const BlockIntegrator *block = blocks.find(getType(ii))->second;
 					if(dual)
 					{
-						const Buffer< pair<uint,uint> > &pext = block->getExternal();
+						const Buffer< pair<uint,uint> > &pext = block->getExternals();
 						if(term.size() < pext.size()) term.resize(pext.size());
 						for(j=0; j<pext.size(); j++)
 						{
@@ -1982,7 +1946,7 @@ uint BlockMesh::getVectors(const FormGrade grade, Buffer<double> &result) const
 							term[j] = (cell < locs ? &result[fields * cell] : &add[fields * (cell - locs)]);
 						}
 					}
-					block->getVectors(&result[fields * getBegin(gdim, ii)], term);
+					block->integrateVectors(&result[fields * getBegin(gdim, ii)], fields, term);
 //						block->integrate(func, getPosition(i), &result[getBegin(gdim, ii)], term);
 				}
 			}
@@ -1991,16 +1955,13 @@ uint BlockMesh::getVectors(const FormGrade grade, Buffer<double> &result) const
 	clearMap(blocks);
 
 	// communicate with external terms
-	if(dual)
-	{
+	if(dual) {
 		const Buffer< pair<uint,uint> > mext = getMyExternals(ext);
-		for(j=0; j<ext.size(); j++)
-		{
+		for(j=0; j<ext.size(); j++) {
 			sendMPI(&add[fields * j], fields * sizeof(double), ext[j].first, 0);
 		}
 		Buffer<double> addition(fields);
-		for(j=0; j<mext.size(); j++)
-		{
+		for(j=0; j<mext.size(); j++) {
 			recvMPI(&addition[0], fields * sizeof(double), mext[j].first, 0);
 			const uint jj = fields * mext[j].second;
 			for(k=0; k<fields; k++) result[jj + k] += addition[k];
@@ -2008,7 +1969,7 @@ uint BlockMesh::getVectors(const FormGrade grade, Buffer<double> &result) const
 	}
 	return fields;
 }
-
+*/
 Sparse<sign> &BlockMesh::integrateDerivative(const FormGrade grade, Sparse<sign> &d) const
 {
 	uint j, k, l;

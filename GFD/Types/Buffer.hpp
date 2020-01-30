@@ -9,11 +9,10 @@ Similar to std::vector but a bit more memory efficient in some cases.
 #include <memory>
 #include <stdio.h>
 #include <string.h>
+#include "Uint.hpp"
 
 namespace gfd
 {
-
-typedef unsigned int uint;
 
 template <typename T>
 class Buffer
@@ -215,6 +214,26 @@ public:
 		memcpy(&data[m_size], buf.m_data, buf.m_size * sizeof(T));
 		m_data = data;
 		m_size = size;
+	}
+	void insert(const Buffer &buf, const uint i) // insert buf at desired location
+	{
+		if(buf.m_size == 0) return;
+		if(i > m_size) {
+			resize(i + buf.size());
+			memcpy(&m_data[i], buf.m_data, buf.m_size * sizeof(T));
+			return;
+		}
+		if(i == m_size) {
+			combine(buf);
+			return;
+		}
+		T *data = new T[m_size + buf.m_size];
+		if(0 < i) memcpy(data, m_data, i * sizeof(T));
+		memcpy(&data[i], buf.m_data, buf.m_size * sizeof(T));
+		memcpy(&data[i+buf.m_size], &m_data[i], (m_size - i) * sizeof(T));
+		delete[] m_data;
+		m_data = data;
+		m_size += buf.m_size;
 	}
 	void mergesum(const Buffer &buf) { // merges another buffer by summing up each common terms
 		if(m_size < buf.m_size) {

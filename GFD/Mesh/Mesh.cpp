@@ -1014,10 +1014,12 @@ sign Mesh::getQuadIncidence(const uint q, const uint b) const {
 }
 
 Vector4 Mesh::getNodePosition(const uint n) const {
-	if(m_dim == 1) return Vector4(getNodePosition1(n),0,0,0);
-	if(m_dim == 2) return Vector4(getNodePosition2(n),0,0);
-	if(m_dim == 3) return Vector4(getNodePosition3(n),0);
-	return getNodePosition4(n);
+	switch(m_dim) {
+	case 1: return Vector4(getNodePosition1(n),0,0,0);
+	case 2: return Vector4(getNodePosition2(n),0,0);
+	case 3: return Vector4(getNodePosition3(n),0);
+	default: return getNodePosition4(n);
+	}
 }
 
 double Mesh::getEdgePosition1(const uint e) const {
@@ -1057,10 +1059,12 @@ Vector4 Mesh::getEdgePosition4(const uint e) const {
 	return p + 0.5 * (1.0 + w / dot) * v;
 }
 Vector4 Mesh::getEdgePosition(const uint e) const {
-	if(m_dim == 1) return Vector4(getEdgePosition1(e),0,0,0);
-	if(m_dim == 2) return Vector4(getEdgePosition2(e),0,0);
-	if(m_dim == 3) return Vector4(getEdgePosition3(e),0);
-	return getEdgePosition4(e);
+	switch(m_dim) {
+	case 1: return Vector4(getEdgePosition1(e),0,0,0);
+	case 2: return Vector4(getEdgePosition2(e),0,0);
+	case 3: return Vector4(getEdgePosition3(e),0);
+	default: return getEdgePosition4(e);
+	}
 }
 
 Vector2 Mesh::getCellPosition2(const Buffer<uint> &n, const uint flag, const SymMatrix2 &a0) const {
@@ -1117,9 +1121,11 @@ Vector4 Mesh::getFacePosition4(const uint f) const {
 		v.xz*v.zt+v.xy*v.yt,v.yz*v.zt-v.xy*v.xt,-v.yz*v.yt-v.xz*v.xt,v.xy*v.xy+v.xz*v.xz+v.yz*v.yz));
 }
 Vector4 Mesh::getFacePosition(const uint f) const {
-	if(m_dim == 2) return Vector4(getFacePosition2(f),0,0);
-	if(m_dim == 3) return Vector4(getFacePosition3(f),0);
-	return getFacePosition4(f);
+	switch(m_dim) {
+	case 2: return Vector4(getFacePosition2(f),0,0);
+	case 3: return Vector4(getFacePosition3(f),0);
+	default: return getFacePosition4(f);
+	}
 }
 Vector3 Mesh::getBodyPosition3(const uint b) const {
 	return getCellPosition3(getBodyNodes(b), getBodyFlag(b), ZEROSYMMATRIX3);
@@ -1128,8 +1134,10 @@ Vector4 Mesh::getBodyPosition4(const uint b) const {
 	return getCellPosition4(getBodyNodes(b), getBodyFlag(b), getBodyVector4(b).dual().outerProduct());
 }
 Vector4 Mesh::getBodyPosition(const uint b) const {
-	if(m_dim == 3) return Vector4(getBodyPosition3(b),0);
-	return getBodyPosition4(b);
+	switch(m_dim) {
+	case 3: return Vector4(getBodyPosition3(b),0);
+	default: return getBodyPosition4(b);
+	}
 }
 Vector4 Mesh::getQuadPosition(const uint q) const {
 	return getCellPosition4(getQuadNodes(q), getQuadFlag(q), ZEROSYMMATRIX4);
@@ -1152,10 +1160,12 @@ Vector4 Mesh::getEdgeAverage4(const uint e) const {
 	return 0.5 * (getNodePosition4(n[0]) + getNodePosition4(n[1]));
 }
 Vector4 Mesh::getEdgeAverage(const uint e) const {
-	if(m_dim == 1) return Vector4(getEdgeAverage1(e),0,0,0);
-	if(m_dim == 2) return Vector4(getEdgeAverage2(e),0,0);
-	if(m_dim == 3) return Vector4(getEdgeAverage3(e),0);
-	return getEdgeAverage4(e);
+	switch(m_dim) {
+	case 1: return Vector4(getEdgeAverage1(e),0,0,0);
+	case 2: return Vector4(getEdgeAverage2(e),0,0);
+	case 3: return Vector4(getEdgeAverage3(e),0);
+	default: return getEdgeAverage4(e);
+	}
 }
 Vector2 Mesh::getFaceAverage2(const uint f) const {
 	const Buffer<uint> n = getFaceNodes(f);
@@ -1218,9 +1228,11 @@ Vector4 Mesh::getFaceAverage4(const uint f) const {
 	return p + d / 3.0;
 }
 Vector4 Mesh::getFaceAverage(const uint f) const {
-	if(m_dim == 2) return Vector4(getFaceAverage2(f),0,0);
-	if(m_dim == 3) return Vector4(getFaceAverage3(f),0);
-	return getFaceAverage4(f);
+	switch(m_dim) {
+	case 2: return Vector4(getFaceAverage2(f),0,0);
+	case 3: return Vector4(getFaceAverage3(f),0);
+	default: return getFaceAverage4(f);
+	}
 }
 Vector3 Mesh::getBodyAverage3(const uint b) const {
 	const Buffer<uint> &f = getBodyFaces(b);
@@ -1271,8 +1283,10 @@ Vector4 Mesh::getBodyAverage4(const uint b) const {
 	return p + 0.75 * d;
 }
 Vector4 Mesh::getBodyAverage(const uint b) const {
-	if(m_dim == 3) return Vector4(getBodyAverage3(b),0);
-	return getBodyAverage4(b);
+	switch(m_dim) {
+	case 3: return Vector4(getBodyAverage3(b),0);
+	default: return getBodyAverage4(b);
+	}
 }
 Vector4 Mesh::getQuadAverage(const uint q) const {
 	const Buffer<uint> &b = getQuadBodies(q);
@@ -1316,10 +1330,12 @@ Vector4 Mesh::getEdgeVector4(const uint e) const {
 	return getNodePosition4(n[1]) - getNodePosition4(n[0]);
 }
 Vector4 Mesh::getEdgeVector(const uint e) const {
-	if(m_dim == 1) return Vector4(getEdgeVector1(e),0,0,0);
-	if(m_dim == 2) return Vector4(getEdgeVector2(e),0,0);
-	if(m_dim == 3) return Vector4(getEdgeVector3(e),0);
-	return getEdgeVector4(e);
+	switch(m_dim) {
+	case 1: return Vector4(getEdgeVector1(e),0,0,0);
+	case 2: return Vector4(getEdgeVector2(e),0,0);
+	case 3: return Vector4(getEdgeVector3(e),0);
+	default: return getEdgeVector4(e);
+	}
 }
 TwoVector2 Mesh::getFaceVector2(const uint f) const {
 	const Buffer<uint> n = getFaceNodes(f);
@@ -1364,9 +1380,11 @@ TwoVector4 Mesh::getFaceVector4(const uint f) const {
 	return 0.5 * v;
 }
 TwoVector4 Mesh::getFaceVector(const uint f) const {
-	if(m_dim == 2) return TwoVector4(getFaceVector2(f),0,0,0,0,0);
-	if(m_dim == 3) return TwoVector4(getFaceVector3(f),0,0,0);
-	return getFaceVector4(f);
+	switch(m_dim) {
+	case 2: return TwoVector4(getFaceVector2(f),0,0,0,0,0);
+	case 3: return TwoVector4(getFaceVector3(f),0,0,0);
+	default: return getFaceVector4(f);
+	}
 }
 ThreeVector3 Mesh::getBodyVector3(const uint b) const {
 	const Buffer<uint> &f = getBodyFaces(b);
@@ -1401,8 +1419,10 @@ ThreeVector4 Mesh::getBodyVector4(const uint b) const {
 	return v / 3.0;
 }
 ThreeVector4 Mesh::getBodyVector(const uint b) const {
-	if(m_dim == 3) return ThreeVector4(getBodyVector3(b),0,0,0);
-	return getBodyVector4(b);
+	switch(m_dim) {
+	case 3: return ThreeVector4(getBodyVector3(b),0,0,0);
+	default: return getBodyVector4(b);
+	}
 }
 FourVector4 Mesh::getQuadVector(const uint q) const {
 	const Buffer<uint> &b = getQuadBodies(q);
@@ -1491,10 +1511,12 @@ Vector4 Mesh::getNodeDualAverage4(const uint n) const {
 	return p + 0.8 * d; // assume 4-dimensional mesh
 }
 Vector4 Mesh::getNodeDualAverage(const uint n) const {
-	if(m_dim == 1) return Vector4(getNodeDualAverage1(n),0,0,0);
-	if(m_dim == 2) return Vector4(getNodeDualAverage2(n),0,0);
-	if(m_dim == 3) return Vector4(getNodeDualAverage3(n),0);
-	return getNodeDualAverage4(n);
+	switch(m_dim) {
+	case 1: return Vector4(getNodeDualAverage1(n),0,0,0);
+	case 2: return Vector4(getNodeDualAverage2(n),0,0);
+	case 3: return Vector4(getNodeDualAverage3(n),0);
+	default: return getNodeDualAverage4(n);
+	}
 }
 Vector2 Mesh::getEdgeDualAverage2(const uint e) const {
 	const Buffer<uint> &f = getEdgeFaces(e);
@@ -1544,10 +1566,12 @@ Vector4 Mesh::getEdgeDualAverage4(const uint e) const {
 	return p + 0.75 * d; // assume 4-dimensional mesh
 }
 Vector4 Mesh::getEdgeDualAverage(const uint e) const {
-	if(m_dim == 1) return Vector4(getEdgePosition1(e),0,0,0);
-	if(m_dim == 2) return Vector4(getEdgeDualAverage2(e),0,0);
-	if(m_dim == 3) return Vector4(getEdgeDualAverage3(e),0);
-	return getEdgeDualAverage4(e);
+	switch(m_dim) {
+	case 1: return Vector4(getEdgePosition1(e),0,0,0);
+	case 2: return Vector4(getEdgeDualAverage2(e),0,0);
+	case 3: return Vector4(getEdgeDualAverage3(e),0);
+	default: return getEdgeDualAverage4(e);
+	}
 }
 Vector3 Mesh::getFaceDualAverage3(const uint f) const {
 	const Buffer<uint> &b = getFaceBodies(f);
@@ -1576,9 +1600,11 @@ Vector4 Mesh::getFaceDualAverage4(const uint f) const {
 	return p + 2.0 / 3.0 * d; // assume 4-dimensional mesh
 }
 Vector4 Mesh::getFaceDualAverage(const uint f) const {
-	if(m_dim == 2) return Vector4(getFacePosition2(f),0,0);
-	if(m_dim == 3) return Vector4(getFaceDualAverage3(f),0);
-	return getFaceDualAverage4(f);
+	switch(m_dim) {
+	case 2: return Vector4(getFacePosition2(f),0,0);
+	case 3: return Vector4(getFaceDualAverage3(f),0);
+	default: return getFaceDualAverage4(f);
+	}
 }
 Vector4 Mesh::getBodyDualAverage4(const uint b) const {
 	const Buffer<uint> &q = getBodyQuads(b);
@@ -1587,8 +1613,10 @@ Vector4 Mesh::getBodyDualAverage4(const uint b) const {
 	return 0.5 * (getQuadPosition(q[1]) + getQuadPosition(q[0]));
 }
 Vector4 Mesh::getBodyDualAverage(const uint b) const {
-	if(m_dim == 3) return Vector4(getBodyPosition3(b),0);
-	return getBodyDualAverage4(b);
+	switch(m_dim) {
+	case 3: return Vector4(getBodyPosition3(b),0);
+	default: return getBodyDualAverage4(b);
+	}
 }
 
 double Mesh::getNodeDualVector1(const uint n) const {
@@ -1638,10 +1666,12 @@ FourVector4 Mesh::getNodeDualVector4(const uint n) const {
 	return 0.25 * v; // assume 4-dimensional mesh
 }
 FourVector4 Mesh::getNodeDualVector(const uint n) const {
-	if(m_dim == 1) return FourVector4(getNodeDualVector1(n));
-	if(m_dim == 2) return FourVector4(getNodeDualVector2(n).xy);
-	if(m_dim == 3) return FourVector4(getNodeDualVector3(n).xyz);
-	return getNodeDualVector4(n);
+	switch(m_dim) {
+	case 1: return FourVector4(getNodeDualVector1(n));
+	case 2: return FourVector4(getNodeDualVector2(n).xy);
+	case 3: return FourVector4(getNodeDualVector3(n).xyz);
+	default: return getNodeDualVector4(n);
+	}
 }
 double Mesh::getEdgeDualVector1(const uint e) const {
 	return (getEdgeVector1(e) > 0.0 ? 1.0 : -1.0);
@@ -1680,10 +1710,12 @@ ThreeVector4 Mesh::getEdgeDualVector4(const uint e) const {
 	return v / 3.0; // assume 4-dimensional mesh
 }
 ThreeVector4 Mesh::getEdgeDualVector(const uint e) const {
-	if(m_dim == 1) return ThreeVector4(0,0,0,getEdgeDualVector1(e));
-	if(m_dim == 2) return ThreeVector4(0,0,getEdgeDualVector2(e));
-	if(m_dim == 3) return ThreeVector4(0,getEdgeDualVector3(e));
-	return getEdgeDualVector4(e);
+	switch(m_dim) {
+	case 1: return ThreeVector4(0,0,0,getEdgeDualVector1(e));
+	case 2: return ThreeVector4(0,0,getEdgeDualVector2(e));
+	case 3: return ThreeVector4(0,getEdgeDualVector3(e));
+	default: return getEdgeDualVector4(e);
+	}
 }
 double Mesh::getFaceDualVector2(const uint f) const {
 	return (getFaceVector2(f).dual() > 0.0 ? 1.0 : -1.0);
@@ -1712,9 +1744,11 @@ TwoVector4 Mesh::getFaceDualVector4(const uint f) const {
 	return 0.5 * v; // assume 4-dimensional mesh
 }
 TwoVector4 Mesh::getFaceDualVector(const uint f) const {
-	if(m_dim == 2) return TwoVector4(0,0,0,0,0,getFaceDualVector2(f));
-	if(m_dim == 3) return TwoVector4(0,0,0,getFaceDualVector3(f));
-	return getFaceDualVector4(f);
+	switch(m_dim) {
+	case 2: return TwoVector4(0,0,0,0,0,getFaceDualVector2(f));
+	case 3: return TwoVector4(0,0,0,getFaceDualVector3(f));
+	default: return getFaceDualVector4(f);
+	}
 }
 double Mesh::getBodyDualVector3(const uint b) const {
 	return (getBodyVector3(b).dual() > 0.0 ? 1.0 : -1.0);
@@ -1731,8 +1765,10 @@ Vector4 Mesh::getBodyDualVector4(const uint b) const {
 	return v; // assume 3-dimensional mesh
 }
 Vector4 Mesh::getBodyDualVector(const uint b) const {
-	if(m_dim == 3) return Vector4(0,0,0,getBodyDualVector3(b));
-	return getBodyDualVector4(b);
+	switch(m_dim) {
+	case 3: return Vector4(0,0,0,getBodyDualVector3(b));
+	default: return getBodyDualVector4(b);
+	}
 }
 double Mesh::getQuadDualVector(const uint q) const {
 	return (getQuadVector(q).dual() > 0.0 ? 1.0 : -1.0);
@@ -1891,8 +1927,7 @@ double Mesh::getQuadHodge(const uint q, const SymFourMatrix4 &metric) const {
 	return metric.xyztxyzt * qdv / qv.xyzt;
 }
 
-Vector4 Mesh::getEdgeDeviation(const uint e, const Vector4 &p) const
-{
+Vector4 Mesh::getEdgeDeviation(const uint e, const Vector4 &p) const {
 	if(m_dim == 1) return Vector4(0,0,0,0);
 	const Buffer<uint> &n = getEdgeNodes(e);
 	const Vector4 p0 = getNodePosition(n[0]);
@@ -1901,8 +1936,7 @@ Vector4 Mesh::getEdgeDeviation(const uint e, const Vector4 &p) const
 	return d - d.dot(v0) / v0.lensq() * v0;
 }
 
-Vector4 Mesh::getFaceDeviation(const uint f, const Vector4 &p) const
-{
+Vector4 Mesh::getFaceDeviation(const uint f, const Vector4 &p) const {
 	if(m_dim <= 2) return Vector4(0,0,0,0);
 
 	uint i;
@@ -1929,8 +1963,7 @@ Vector4 Mesh::getFaceDeviation(const uint f, const Vector4 &p) const
 	return d - d.dot(v[0]) / sq0 * v[0] - d.dot(v[1]) / sq1 * v[1];
 }
 
-Vector4 Mesh::getBodyDeviation(const uint b, const Vector4 &p) const
-{
+Vector4 Mesh::getBodyDeviation(const uint b, const Vector4 &p) const {
 	if(m_dim <= 3) return Vector4(0,0,0,0);
 
 	uint i;
@@ -2037,16 +2070,32 @@ uint Mesh::findQuad(const Buffer<uint> &b) const {
 	return NONE;
 }
 
-void Mesh::setNodePosition(const uint n, const Vector4 &p)
-{
+void Mesh::setNodePosition(const uint n, const Vector4 &p) {
 	const uint nn = m_dim * n;
-	m_p[nn] = p.x;
-	if(m_dim == 1) return;
-	m_p[nn+1] = p.y;
-	if(m_dim == 2) return;
-	m_p[nn+2] = p.z;
-	if(m_dim == 3) return;
-	m_p[nn+3] = p.t;
+	switch(m_dim) {
+	case 1: {
+		m_p[nn] = p.x;
+		break;
+	}
+	case 2: {
+		m_p[nn] = p.x;
+		m_p[nn+1] = p.y;
+		break;
+	}
+	case 3: {
+		m_p[nn] = p.x;
+		m_p[nn+1] = p.y;
+		m_p[nn+2] = p.z;
+		break;
+	}
+	default: {
+		m_p[nn] = p.x;
+		m_p[nn+1] = p.y;
+		m_p[nn+2] = p.z; 
+		m_p[nn+3] = p.t;
+		break;
+	}
+	}
 }
 
 void Mesh::setMetric(const SymMatrix4 &m, const uint flag) {
@@ -2057,13 +2106,30 @@ void Mesh::setMetric(const SymMatrix4 &m, const uint flag) {
 		for(uint i=msize; i<flag; i++) setMetric(IDENTITYSYMMATRIX4, i);
 	}
 	double *mm = &m_m[flag * terms];
-	mm[0] = m.xx;
-	if(m_dim == 1) return;
-	mm[1] = m.xy; mm[2] = m.yy;
-	if(m_dim == 2) return;
-	mm[3] = m.xz; mm[4] = m.yz; mm[5] = m.zz;
-	if(m_dim == 3) return;
-	mm[6] = m.xt; mm[7] = m.yt; mm[8] = m.zt; mm[9] = m.tt;
+	switch(m_dim) {
+	case 1: {
+		mm[0] = m.xx;
+		break;
+	}
+	case 2: {
+		mm[0] = m.xx;
+		mm[1] = m.xy; mm[2] = m.yy;
+		break;
+	}
+	case 3: {
+		mm[0] = m.xx;
+		mm[1] = m.xy; mm[2] = m.yy;
+		mm[3] = m.xz; mm[4] = m.yz; mm[5] = m.zz;
+		break;
+	}
+	default: {
+		mm[0] = m.xx;
+		mm[1] = m.xy; mm[2] = m.yy;
+		mm[3] = m.xz; mm[4] = m.yz; mm[5] = m.zz;
+		mm[6] = m.xt; mm[7] = m.yt; mm[8] = m.zt; mm[9] = m.tt;
+		break;
+	}
+	}
 }
 double Mesh::getMetric1(const uint flag) const {
 	if(flag >= m_m.size()) return 1.0;
@@ -2085,10 +2151,12 @@ SymMatrix4 Mesh::getMetric4(const uint flag) const {
 	return SymMatrix4(mm[0], mm[1], mm[2], mm[3], mm[4], mm[5], mm[6], mm[7], mm[8], mm[9]); 
 }
 SymMatrix4 Mesh::getMetric(const uint flag) const {
-	if(m_dim == 1) return SymMatrix4(getMetric1(flag),0,1,0,0,1,0,0,0,1);
-	if(m_dim == 2) return SymMatrix4(getMetric2(flag),0,0,1,0,0,0,1);
-	if(m_dim == 3) return SymMatrix4(getMetric3(flag),0,0,0,1);
-	return getMetric4(flag);
+	switch(m_dim) {
+	case 1: return SymMatrix4(getMetric1(flag),0,1,0,0,1,0,0,0,1);
+	case 2: return SymMatrix4(getMetric2(flag),0,0,1,0,0,0,1);
+	case 3: return SymMatrix4(getMetric3(flag),0,0,0,1);
+	default: return getMetric4(flag);
+	}
 }
 double Mesh::getTransformed1(const double &r, const uint flag) const {
 	if(flag >= m_m.size()) return r;
@@ -2110,10 +2178,12 @@ Vector4 Mesh::getTransformed4(const Vector4 &r, const uint flag) const {
 	return SymMatrix4(mm[0], mm[1], mm[2], mm[3], mm[4], mm[5], mm[6], mm[7], mm[8], mm[9]) * r; 
 }
 Vector4 Mesh::getTransformed(const Vector4 &r, const uint flag) const {
-	if(m_dim == 1) return Vector4(getTransformed1(r.x, flag),0,0,0);
-	if(m_dim == 2) return Vector4(getTransformed2(r.toVector2(), flag),0,0);
-	if(m_dim == 3) return Vector4(getTransformed3(r.toVector3(), flag),0);
-	return getTransformed4(r, flag);
+	switch(m_dim) {
+	case 1: return Vector4(getTransformed1(r.x, flag),0,0,0);
+	case 2: return Vector4(getTransformed2(r.toVector2(), flag),0,0);
+	case 3: return Vector4(getTransformed3(r.toVector3(), flag),0);
+	default: return getTransformed4(r, flag);
+	}
 }
 
 void Mesh::transform(const Matrix4 &mat) {

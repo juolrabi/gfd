@@ -1,14 +1,14 @@
-/*
-BlockIntegrator.hpp implements DeRham map (integrates continuous function into discrete form)
-*/
+/**
+ * BlockIntegrator.hpp implements DeRham map (integrates continuous function into discrete forms)
+ * Author: Jukka Räbinä, University of Jyväskylä, 2020.
+ */
 
 #ifndef _BLOCKINTEGRATOR_HPP_INCLUDED_
 #define _BLOCKINTEGRATOR_HPP_INCLUDED_
 
+#include "../Discrete/Quadrature.hpp"
 #include "../Discrete/Form.hpp"
 #include "../Mesh/PartMesh.hpp"
-
-//#include "../Types/MpiEasy.hpp"
 
 namespace gfd
 {
@@ -16,48 +16,28 @@ namespace gfd
 class BlockIntegrator
 {
 public:
-	static uint getFieldDimension(const FormGrade grade, const uint dim) {
-		const uint gdim = FormGradeDimension(grade);
-		if(gdim == 0 || gdim == 4) return 1;
-		if(gdim == 1) return dim;
-		if(gdim == 2) return dim * (dim - 1) / 2;
-		return dim * (dim - 1) * (dim - 2) / 6;
-	}
-
 	BlockIntegrator();
 	virtual ~BlockIntegrator() { clear(); }
 	void clear();
 
-	void init(const FormGrade grade, const PartMesh &mesh, const uint num = 2);
-	void initWedge(const FormGrade grade, const PartMesh &mesh, const uint num = 2);
-	const Buffer< pair<uint,uint> > &getExternal() const { return m_ext; }
-	template<typename T> void integrate(void func(const Vector4 &, T *result), const Vector4 &p0, T *result, const Buffer<T *> &exterm) const {
-		Buffer<T> f(m_fields);
-		for(uint i=0; i<m_setter.size(); i++) {
+	void init(const FormGrade grade, const PartMesh &mesh, const int num);
+	void initWedge(const FormGrade grade, const PartMesh &mesh, const int num);
+	template<typename T> void integrate(T func(const Buffer<double> &), const Vector4 &p, T *result, const Buffer<T *> &exterm) const {
+		for(uint i=0; i<m_q.size(); i++) {
 			T &ival = (i < m_values ? result[i] : *exterm[i - m_values]);
-			const Buffer<double> &setteri = m_setter[i];
-			for(uint j=0; j<setteri.size(); ) {
-				Vector4 p(setteri[j++] + p0.x,0,0,0);
-				if(m_dim >= 2) p.y = setteri[j++] + p0.y;
-				if(m_dim >= 3) p.z = setteri[j++] + p0.z;
-				if(m_dim >= 4) p.t = setteri[j++] + p0.t;
-				func(p, &f[0]);
-				for(uint k=0; k<m_fields; k++) ival += setteri[j++] * f[k];
-			}
+			m_q[i].integrateRelocated(func, p, ival);
 		}
 	}
-	void getVectors(double *result, const Buffer<double *> &exterm) const;
 
-	uint getNumberOfLocalValues() const { return m_values; }
-	const Buffer<double> &getIntegrationData(const uint i) const { return m_setter[i]; }
+	uint getLocals() const { return m_values; }
+	const Buffer< pair<uint,uint> > &getExternals() const { return m_ext; }
+	const Quadrature &getQuadrature(const uint i) const { return m_q[i]; }
 
 protected:
 
-	uint m_dim; // dimension of the space
-	uint m_fields; // size of the field variable
-	uint m_values; // number of discrete values to be used
-	Buffer< Buffer<double> > m_setter;
-	Buffer< pair<uint,uint> > m_ext;
+	Buffer<Quadrature> m_q; // defines numerical integration
+	uint m_values; // number of local terms
+	Buffer< pair<uint,uint> > m_ext; // external term data
 };
 
 }

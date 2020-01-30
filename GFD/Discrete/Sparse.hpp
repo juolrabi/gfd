@@ -29,7 +29,7 @@ public:
 	void printData() const {
 		cout << "Sparse matrix:" << endl;
 		cout << "m_width = " << m_width << endl;
-		Discrete<T>::printVectorData();
+		Discrete<T>::printData();
 		uint i;
 		cout << "m_beg =";
 		for(i=0; i<m_beg.size(); i++) cout << " " << m_beg[i];
@@ -161,7 +161,7 @@ public:
 		this->m_val.resize(k);
 		return setCommunication(ext, extv, srank, rrank);
 	}
-	Sparse &setSparse(const uint width, const uint height, const Buffer< pair<uint, Buffer< pair<uint, T> > > > &val, const Buffer< pair<uint,uint> > &ext = Buffer< pair<uint,uint> >()) {
+	Sparse &setSparse(const uint width, const uint height, const Buffer< pair<uint, Buffer< pair<uint, T> > > > &val = Buffer< pair<uint, Buffer< pair<uint, T> > > >(), const Buffer< pair<uint,uint> > &ext = Buffer< pair<uint,uint> >()) {
 		const uint thisRank = getMPIrank();
 		Buffer<uint> srank(getMPIranks()-1);
 		for(uint i=0; i<srank.size(); i++) srank[i] = (i < thisRank ? i : i + 1);
@@ -209,13 +209,14 @@ public:
 		for(i=0; i<m_rval.size(); i++) m_rval[i] = r.m_rval[i];
 		return *this;
 	}
-	template<typename R> Sparse &setNegation(const Sparse<R> &r) {
+	template<typename R> Sparse &setFunction(const Sparse<R> &r, T func(const R &)) {
 		if(this != (void*)&r) setShape(r);
 		uint i;
-		for(i=0; i<this->m_val.size(); i++) this->m_val[i] = -r.m_val[i];
-		for(i=0; i<m_rval.size(); i++) m_rval[i] = -r.m_rval[i];
+		for(i=0; i<this->m_val.size(); i++) this->m_val[i] = func(r.m_val[i]);
+		for(i=0; i<m_rval.size(); i++) m_rval[i] = func(r.m_rval[i]);
 		return *this;
 	}
+	template<typename R> Sparse &setNegation(const Sparse<R> &r) { return setFunction(r, functionNegation); }
 	template<typename R> Sparse &setTranspose(const Sparse<R> &r) {
 		uint i, j, k, m, n;
 		// local terms
@@ -316,6 +317,368 @@ public:
 		this->m_row.clear();
 		if(r.m_full) return *this;
 		return toSparse();
+	}
+	template<typename L, typename R> Sparse &setUnion(const Sparse<L> &l, const Sparse<R> &r, T func(const L &, const R &)) {
+		if(orMPI(l.m_width != r.m_width || l.m_height != r.m_height)) return setEmpty(); // the dimensions do not match
+		m_width = l.m_width;
+		this->m_height = l.m_height;
+		Buffer<uint> beg;
+		Buffer<uint> row;
+		uint cols = 0;
+		Buffer<uint> col(l.m_col.size() + r.m_col.size());
+		Buffer<T> val(col.size());
+		Buffer<uint> lto(l.m_beg.size());
+		Buffer<uint> rto(r.m_beg.size());
+		if(l.m_full) {
+			beg.resize(l.m_height);
+			if(r.m_full) { // both l and r are full
+				for(uint i=0; i<l.m_height; i++) {
+					beg[i] = cols;
+					lto[i] = i;
+					rto[i] = i;
+					mergeRow(l, i, r, i, val, col, cols, func);
+				}
+			}
+			else { // only l is full
+				uint i = 0, ri = 0;
+				while(ri < r.m_row.size()) {
+					while(i < r.m_row[ri]) {
+						beg[i] = cols;
+						lto[i] = i;
+						mergeRow(l, i++, r, uint(-1), val, col, cols, func);
+					}
+					beg[i] = cols;
+					lto[i] = i;
+					rto[ri] = i;
+					mergeRow(l, i++, r, ri++, val, col, cols, func);
+				}
+				while(i < l.m_height) {
+					beg[i] = cols;
+					lto[i] = i;
+					mergeRow(l, i++, r, uint(-1), val, col, cols, func);
+				}
+			}
+			this->m_full = true;
+		}
+		else if(r.m_full) { // only r is full
+			beg.resize(r.m_height);
+			uint i=0, li = 0;
+			while(li < l.m_row.size()) {
+				while(i < l.m_row[li])  {
+					beg[i] = cols;
+					rto[i] = i;
+					mergeRow(l, uint(-1), r, i++, val, col, cols, func);
+				}
+				beg[i] = cols;
+				lto[li] = i;
+				rto[i] = i;
+				mergeRow(l, li++, r, i++, val, col, cols, func);
+			}
+			while(i < r.m_height) {
+				beg[i] = cols;
+				rto[i] = i;
+				mergeRow(l, uint(-1), r, i++, val, col, cols, func);
+			}
+			this->m_full = true;
+		}
+		else { // both l and r are sparse
+			uint rowsize = l.m_row.size() + r.m_row.size();
+			if(rowsize > l.m_height) rowsize = l.m_height;
+			row.resize(rowsize);
+			beg.resize(rowsize);
+			uint i = 0, li = 0, ri = 0;
+			while(li < l.m_row.size() && ri < r.m_row.size()) {
+				beg[i] = cols;
+				if(l.m_row[li] < r.m_row[ri]) {
+					lto[li] = i;
+					row[i++] = l.m_row[li];
+					mergeRow(l, li++, r, uint(-1), val, col, cols, func);
+				}
+				else if(l.m_row[li] > r.m_row[ri]) {
+					rto[ri] = i;
+					row[i++] = r.m_row[ri];
+					mergeRow(l, uint(-1), r, ri++, val, col, cols, func);
+				}
+				else {
+					lto[li] = i;
+					rto[ri] = i;
+					row[i++] = l.m_row[li];
+					mergeRow(l, li++, r, ri++, val, col, cols, func);
+				}
+			}
+			while(li < l.m_row.size()) {
+				beg[i] = cols;
+				lto[li] = i;
+				row[i++] = l.m_row[li];
+				mergeRow(l, li++, r, uint(-1), val, col, cols, func);
+			}
+			while(ri < r.m_row.size()) {
+				beg[i] = cols;
+				rto[ri] = i;
+				row[i++] = r.m_row[ri];
+				mergeRow(l, uint(-1), r, ri++, val, col, cols, func);
+			}
+			beg.resize(i);
+			row.resize(i);
+			this->m_full = false;
+		}
+		val.resize(cols);
+		col.resize(cols);
+		this->m_row.swap(row);
+		m_beg.swap(beg);
+		m_col.swap(col);
+		this->m_val.swap(val);
+		row.clear();
+		beg.clear();
+		col.clear();
+		val.clear();
+		// initialize m_send
+		uint i, j, k, m, n;
+		uint iranks = 0;
+		Buffer<uint> irank;
+		for(i=0; i<l.m_send.size(); ) {
+			const uint ranki = l.m_send[i++];
+			irank.gather(ranki, iranks);
+			sendMPI(&l.m_send[i+1], l.m_send[i] * sizeof(uint), ranki, 0);
+			i += 1 + l.m_send[i];
+		}
+		for(i=0; i<r.m_send.size(); ) {
+			const uint ranki = r.m_send[i++];
+			irank.gatherOnce(ranki, iranks);
+			sendMPI(&r.m_send[i+1], r.m_send[i] * sizeof(uint), ranki, 1);
+			i += 1 + r.m_send[i];
+		}
+		Buffer<uint> sends(iranks, 0);
+		Buffer< Buffer<uint> > send(iranks);
+		for(i=0; i<l.m_send.size(); ) {
+			const uint ranki = l.m_send[i++];
+			const uint ii = irank.findFirst(ranki, iranks);
+			for(j=l.m_send[i++]; j>0; j--) send[ii].gather(l.m_send[i++], sends[ii]);
+		}
+		for(i=0; i<r.m_send.size(); ) {
+			const uint ranki = r.m_send[i++];
+			const uint ii = irank.findFirst(ranki, iranks);
+			for(j=r.m_send[i++]; j>0; j--) send[ii].gatherOnce(r.m_send[i++], sends[ii]);
+		}
+		for(i=0,m=0; i<iranks; i++) m += 2 + sends[i];
+		m_send.clear();
+		m_send.resize(m);
+		for(i=0,m=0; i<iranks; i++) {
+			m_send[m++] = irank[i];
+			m_send[m++] = sends[i];
+			for(j=0; j<sends[i]; j++) m_send[m++] = send[i][j];
+		}
+		send.clear();
+		// initialize m_recv and m_rval
+		iranks = 0;
+		uint terms = 0;
+		for(i=0; i<l.m_recv.size(); ) {
+			const uint ranki = l.m_recv[i++];
+			irank.gather(ranki, iranks);
+			terms += l.m_recv[i];
+			for(j=l.m_recv[i++]; j>0; j--) i += 1 + l.m_recv[i];
+		}
+		for(i=0; i<r.m_recv.size(); ) {
+			const uint ranki = r.m_recv[i++];
+			irank.gatherOnce(ranki, iranks);
+			terms += r.m_recv[i];
+			for(j=r.m_recv[i++]; j>0; j--) i += 1 + r.m_recv[i];
+		}
+		Buffer<uint> recvs(iranks, 0);
+		Buffer< Buffer<pair<uint,uint> > > recv(iranks);
+		Buffer< Buffer<pair<uint,pair<L,R> > > > term(terms);
+		terms = 0;
+		for(i=0,n=0; i<l.m_recv.size(); ) {
+			const uint ranki = l.m_recv[i++];
+			const uint ii = irank.findFirst(ranki, iranks);
+			Buffer<uint> buf(l.m_recv[i++]);
+			recvMPI(&buf[0], buf.size() * sizeof(uint), ranki, 0);
+			for(j=0; j<buf.size(); j++) {
+				recv[ii].gather(pair<uint,uint>(buf[j], terms), recvs[ii]);
+				Buffer<pair<uint,pair<L,R> > > &termj = term[terms++];
+				termj.resize(l.m_recv[i++]);
+				for(k=0; k<termj.size(); k++,i++,n++) termj[k] = pair<uint,pair<L,R> >(lto[l.m_recv[i]], pair<L,R>(l.m_rval[n], r.m_zero));
+			}
+		}
+		for(i=0,n=0; i<r.m_recv.size(); ) {
+			const uint ranki = r.m_recv[i++];
+			const uint ii = irank.findFirst(ranki, iranks);
+			Buffer<uint> buf(r.m_recv[i++]);
+			recvMPI(&buf[0], buf.size() * sizeof(uint), ranki, 1);
+			for(j=0; j<buf.size(); j++) {
+				for(k=0; k<recvs[ii]; k++) {
+					if(recv[ii][k].first == buf[j]) break;
+				}
+				if(k < recvs[ii]) { // insert into existing term
+					Buffer<pair<uint,pair<L,R> > > &termj = term[recv[ii][k].second];
+					for(k=r.m_recv[i++]; k>0; k--,i++, n++) {
+						const uint rtoi = rto[r.m_recv[i]];
+						for(m=0; m<termj.size() && termj[m].first!=rtoi; m++);
+						if(m < termj.size()) termj[m].second.second = r.m_rval[n];
+						else termj.push_back(pair<uint,pair<L,R> >(rtoi, pair<L,R>(l.m_zero, r.m_rval[n])));
+					}
+				}
+				else { // create new term
+					recv[ii].gather(pair<uint,uint>(buf[j], terms), recvs[ii]);
+					Buffer<pair<uint,pair<L,R> > > &termj = term[terms++];
+					termj.resize(r.m_recv[i++]);
+					for(k=0; k<termj.size(); k++,i++,n++) termj[k] = pair<uint,pair<L,R> >(rto[r.m_recv[i]], pair<L,R>(l.m_zero, r.m_rval[n]));
+				}
+			}
+		}
+		for(i=0,m=0,n=0; i<iranks; i++) {
+			m += 2;
+			for(j=0; j<recvs[i]; j++) {
+				const uint sizej = term[recv[i][j].second].size();
+				m += 1 + sizej;
+				n += sizej;
+			}
+		}
+		m_recv.clear();
+		m_recv.resize(m);
+		m_rval.clear();
+		m_rval.resize(n);
+		for(i=0,m=0,n=0; i<iranks; i++) {
+			m_recv[m++] = irank[i];
+			m_recv[m++] = recvs[i];
+			for(j=0; j<recvs[i]; j++) {
+				const Buffer<pair<uint,pair<L,R> > > &termj = term[recv[i][j].second];
+				m_recv[m++] = termj.size();
+				for(k=0; k<termj.size(); k++,m++,n++) {
+					m_recv[m] = termj[k].first;
+					m_rval[n] = func(termj[k].second.first, termj[k].second.second);
+				}
+			}
+		}
+		recv.clear();
+		term.clear();
+		return *this;
+	}
+	template<typename L, typename R> Sparse &setUnion(const Sparse<L> &l, const Diagonal<R> &r, T func(const L &, const R &)) {
+		if(orMPI(l.m_width != r.m_height || l.m_height != r.m_height)) return setEmpty(); // the dimensions do not match
+		m_width = l.m_width;
+		this->m_height = l.m_height;
+		Buffer<uint> beg;
+		Buffer<uint> row;
+		uint cols = 0;
+		Buffer<uint> col(l.m_col.size() + r.m_val.size());
+		Buffer<T> val(col.size());
+		Buffer<uint> lto(l.m_beg.size());
+		if(l.m_full) {
+			beg.resize(l.m_height);
+			if(r.m_full) { // both l and r are full
+				for(uint i=0; i<l.m_height; i++) {
+					beg[i] = cols;
+					lto[i] = i;
+					mergeRow(l, i, r, i, val, col, cols, func);
+				}
+			}
+			else { // only l is full
+				uint i = 0, ri = 0;
+				while(ri < r.m_row.size()) {
+					while(i < r.m_row[ri]) {
+						beg[i] = cols;
+						lto[i] = i;
+						mergeRow(l, i++, r, uint(-1), val, col, cols, func);
+					}
+					beg[i] = cols;
+					lto[i] = i;
+					mergeRow(l, i++, r, ri++, val, col, cols, func);
+				}
+				while(i < l.m_height) {
+					beg[i] = cols;
+					lto[i] = i;
+					mergeRow(l, i++, r, uint(-1), val, col, cols, func);
+				}
+			}
+			this->m_full = true;
+		}
+		else if(r.m_full) { // only r is full
+			beg.resize(r.m_height);
+			uint i=0, li = 0;
+			while(li < l.m_row.size()) {
+				while(i < l.m_row[li])  {
+					beg[i] = cols;
+					mergeRow(l, uint(-1), r, i++, val, col, cols, func);
+				}
+				beg[i] = cols;
+				lto[li] = i;
+				mergeRow(l, li++, r, i++, val, col, cols, func);
+			}
+			while(i < r.m_height) {
+				beg[i] = cols;
+				mergeRow(l, uint(-1), r, i++, val, col, cols, func);
+			}
+			this->m_full = true;
+		}
+		else { // both l and r are sparse
+			uint rowsize = l.m_row.size() + r.m_row.size();
+			if(rowsize > l.m_height) rowsize = l.m_height;
+			row.resize(rowsize);
+			beg.resize(rowsize);
+			uint i = 0, li = 0, ri = 0;
+			while(li < l.m_row.size() && ri < r.m_row.size()) {
+				beg[i] = cols;
+				if(l.m_row[li] < r.m_row[ri]) {
+					lto[li] = i;
+					row[i++] = l.m_row[li];
+					mergeRow(l, li++, r, uint(-1), val, col, cols, func);
+				}
+				else if(l.m_row[li] > r.m_row[ri]) {
+					row[i++] = r.m_row[ri];
+					mergeRow(l, uint(-1), r, ri++, val, col, cols, func);
+				}
+				else {
+					lto[li] = i;
+					row[i++] = l.m_row[li];
+					mergeRow(l, li++, r, ri++, val, col, cols, func);
+				}
+			}
+			while(li < l.m_row.size()) {
+				beg[i] = cols;
+				lto[li] = i;
+				row[i++] = l.m_row[li];
+				mergeRow(l, li++, r, uint(-1), val, col, cols, func);
+			}
+			while(ri < r.m_row.size()) {
+				beg[i] = cols;
+				row[i++] = r.m_row[ri];
+				mergeRow(l, uint(-1), r, ri++, val, col, cols, func);
+			}
+			beg.resize(i);
+			row.resize(i);
+			this->m_full = false;
+		}
+		val.resize(cols);
+		col.resize(cols);
+		this->m_row.swap(row);
+		m_beg.swap(beg);
+		m_col.swap(col);
+		this->m_val.swap(val);
+		row.clear();
+		beg.clear();
+		col.clear();
+		val.clear();
+		// initialize send, recv and rval
+		if(this != (void*)&l) {
+			m_send = l.m_send;
+			m_recv.resize(l.m_recv.size());
+			m_rval.resize(l.m_rval.size());
+		}
+		uint i, j, k;
+		for(i=0; i<m_recv.size(); )	{
+			m_recv[i] = l.m_recv[i];
+			i++;
+			m_recv[i] = l.m_recv[i];
+			for(j=m_recv[i++]; j>0; j--) {
+				m_recv[i] = l.m_recv[i];
+				for(k=m_recv[i++]; k>0; k--,i++) {
+					m_recv[i] = lto[l.m_recv[i]];
+				}
+			}
+		}
+		for(i=0; i<m_rval.size(); i++) m_rval[i] = func(l.m_rval[i], r.m_zero);
+		return *this;
 	}
 	template<typename L, typename R> Sparse &setPlus(const Sparse<L> &l, const Sparse<R> &r) { return setUnion(l, r, functionPlus); }
 	template<typename L, typename R> Sparse &setMinus(const Sparse<L> &l, const Sparse<R> &r) { return setUnion(l, r, functionMinus); }
@@ -678,14 +1041,14 @@ public:
 		m_rval.resize(rvals);
 		return toSparse();
 	}
-	template<typename L, typename R> Sparse &setScaleRight(const Sparse<L> &l, const R &r) {
+	template<typename L, typename R> Sparse &setScale(const Sparse<L> &l, const R &r) {
 		if(this != (void*)&l) setShape(l);
 		uint i;
 		for(i=0; i<this->m_val.size(); i++) this->m_val[i] = l.m_val[i] * r;
 		for(i=0; i<m_rval.size(); i++) m_rval[i] = l.m_rval[i] * r;
 		return *this;
 	}
-	template<typename L, typename R> Sparse &setScaleLeft(const L &l, const Sparse<R> &r) {
+	template<typename L, typename R> Sparse &setScale(const L &l, const Sparse<R> &r) {
 		if(this != (void*)&r) setShape(r);
 		uint i;
 		for(i=0; i<this->m_val.size(); i++) this->m_val[i] = l * r.m_val[i];
@@ -698,8 +1061,7 @@ public:
 	template<typename R> Sparse &operator-=(const Sparse<R> &r) { return setMinus(*this, r); }
 	template<typename R> Sparse &operator*=(const Sparse<R> &r) { return setTimes(*this, r); }
 	template<typename R> Sparse &operator*=(const Diagonal<R> &r) { return setTimes(*this, r); } // multiply from right by a diagonal matrix
-	template<typename R> Sparse &scaleRight(const R &r) { return setScaleRight(*this, r); } // multiply from right by a scalar
-	template<typename L> Sparse &scaleLeft(const L &l) { return setScaleLeft(l, *this); } // multiply from left by a scalar
+	template<typename R> Sparse &scale(const R &r) { return setScale(*this, r); } // multiply from right by a scalar
 
 	// trim functions
 	Sparse &trimFull() { // convert sparse to full
@@ -808,7 +1170,7 @@ public:
 
 protected:
 	Sparse &setEmpty() {
-		Discrete<T>::setVectorEmpty();
+		Discrete<T>::setEmpty();
 		m_width = 0;
 		m_beg.clear();
 		m_col.clear();
@@ -870,375 +1232,13 @@ protected:
 		return *this;
 	}
 	template<typename R> Sparse &setShape(const Sparse<R> &r) {
-		Discrete<T>::setVectorShape(r);
+		Discrete<T>::setShape(r);
 		m_width = r.m_width;
 		m_beg = r.m_beg;
 		m_col = r.m_col;
 		m_send = r.m_send;
 		m_recv = r.m_recv;
 		m_rval.resize(r.m_rval.size());
-		return *this;
-	}
-	template<typename L, typename R> Sparse &setUnion(const Sparse<L> &l, const Sparse<R> &r, void (*func)(T &, const L &, const R &)) {
-		if(orMPI(l.m_width != r.m_width || l.m_height != r.m_height)) return setEmpty(); // the dimensions do not match
-		m_width = l.m_width;
-		this->m_height = l.m_height;
-		Buffer<uint> beg;
-		Buffer<uint> row;
-		uint cols = 0;
-		Buffer<uint> col(l.m_col.size() + r.m_col.size());
-		Buffer<T> val(col.size());
-		Buffer<uint> lto(l.m_beg.size());
-		Buffer<uint> rto(r.m_beg.size());
-		if(l.m_full) {
-			beg.resize(l.m_height);
-			if(r.m_full) { // both l and r are full
-				for(uint i=0; i<l.m_height; i++) {
-					beg[i] = cols;
-					lto[i] = i;
-					rto[i] = i;
-					mergeRow(l, i, r, i, val, col, cols, func);
-				}
-			}
-			else { // only l is full
-				uint i = 0, ri = 0;
-				while(ri < r.m_row.size()) {
-					while(i < r.m_row[ri]) {
-						beg[i] = cols;
-						lto[i] = i;
-						mergeRow(l, i++, r, uint(-1), val, col, cols, func);
-					}
-					beg[i] = cols;
-					lto[i] = i;
-					rto[ri] = i;
-					mergeRow(l, i++, r, ri++, val, col, cols, func);
-				}
-				while(i < l.m_height) {
-					beg[i] = cols;
-					lto[i] = i;
-					mergeRow(l, i++, r, uint(-1), val, col, cols, func);
-				}
-			}
-			this->m_full = true;
-		}
-		else if(r.m_full) { // only r is full
-			beg.resize(r.m_height);
-			uint i=0, li = 0;
-			while(li < l.m_row.size()) {
-				while(i < l.m_row[li])  {
-					beg[i] = cols;
-					rto[i] = i;
-					mergeRow(l, uint(-1), r, i++, val, col, cols, func);
-				}
-				beg[i] = cols;
-				lto[li] = i;
-				rto[i] = i;
-				mergeRow(l, li++, r, i++, val, col, cols, func);
-			}
-			while(i < r.m_height) {
-				beg[i] = cols;
-				rto[i] = i;
-				mergeRow(l, uint(-1), r, i++, val, col, cols, func);
-			}
-			this->m_full = true;
-		}
-		else { // both l and r are sparse
-			uint rowsize = l.m_row.size() + r.m_row.size();
-			if(rowsize > l.m_height) rowsize = l.m_height;
-			row.resize(rowsize);
-			beg.resize(rowsize);
-			uint i = 0, li = 0, ri = 0;
-			while(li < l.m_row.size() && ri < r.m_row.size()) {
-				beg[i] = cols;
-				if(l.m_row[li] < r.m_row[ri]) {
-					lto[li] = i;
-					row[i++] = l.m_row[li];
-					mergeRow(l, li++, r, uint(-1), val, col, cols, func);
-				}
-				else if(l.m_row[li] > r.m_row[ri]) {
-					rto[ri] = i;
-					row[i++] = r.m_row[ri];
-					mergeRow(l, uint(-1), r, ri++, val, col, cols, func);
-				}
-				else {
-					lto[li] = i;
-					rto[ri] = i;
-					row[i++] = l.m_row[li];
-					mergeRow(l, li++, r, ri++, val, col, cols, func);
-				}
-			}
-			while(li < l.m_row.size()) {
-				beg[i] = cols;
-				lto[li] = i;
-				row[i++] = l.m_row[li];
-				mergeRow(l, li++, r, uint(-1), val, col, cols, func);
-			}
-			while(ri < r.m_row.size()) {
-				beg[i] = cols;
-				rto[ri] = i;
-				row[i++] = r.m_row[ri];
-				mergeRow(l, uint(-1), r, ri++, val, col, cols, func);
-			}
-			beg.resize(i);
-			row.resize(i);
-			this->m_full = false;
-		}
-		val.resize(cols);
-		col.resize(cols);
-		this->m_row.swap(row);
-		m_beg.swap(beg);
-		m_col.swap(col);
-		this->m_val.swap(val);
-		row.clear();
-		beg.clear();
-		col.clear();
-		val.clear();
-		// initialize m_send
-		uint i, j, k, m, n;
-		uint iranks = 0;
-		Buffer<uint> irank;
-		for(i=0; i<l.m_send.size(); ) {
-			const uint ranki = l.m_send[i++];
-			irank.gather(ranki, iranks);
-			sendMPI(&l.m_send[i+1], l.m_send[i] * sizeof(uint), ranki, 0);
-			i += 1 + l.m_send[i];
-		}
-		for(i=0; i<r.m_send.size(); ) {
-			const uint ranki = r.m_send[i++];
-			irank.gatherOnce(ranki, iranks);
-			sendMPI(&r.m_send[i+1], r.m_send[i] * sizeof(uint), ranki, 1);
-			i += 1 + r.m_send[i];
-		}
-		Buffer<uint> sends(iranks, 0);
-		Buffer< Buffer<uint> > send(iranks);
-		for(i=0; i<l.m_send.size(); ) {
-			const uint ranki = l.m_send[i++];
-			const uint ii = irank.findFirst(ranki, iranks);
-			for(j=l.m_send[i++]; j>0; j--) send[ii].gather(l.m_send[i++], sends[ii]);
-		}
-		for(i=0; i<r.m_send.size(); ) {
-			const uint ranki = r.m_send[i++];
-			const uint ii = irank.findFirst(ranki, iranks);
-			for(j=r.m_send[i++]; j>0; j--) send[ii].gatherOnce(r.m_send[i++], sends[ii]);
-		}
-		for(i=0,m=0; i<iranks; i++) m += 2 + sends[i];
-		m_send.clear();
-		m_send.resize(m);
-		for(i=0,m=0; i<iranks; i++) {
-			m_send[m++] = irank[i];
-			m_send[m++] = sends[i];
-			for(j=0; j<sends[i]; j++) m_send[m++] = send[i][j];
-		}
-		send.clear();
-		// initialize m_recv and m_rval
-		iranks = 0;
-		uint terms = 0;
-		for(i=0; i<l.m_recv.size(); ) {
-			const uint ranki = l.m_recv[i++];
-			irank.gather(ranki, iranks);
-			terms += l.m_recv[i];
-			for(j=l.m_recv[i++]; j>0; j--) i += 1 + l.m_recv[i];
-		}
-		for(i=0; i<r.m_recv.size(); ) {
-			const uint ranki = r.m_recv[i++];
-			irank.gatherOnce(ranki, iranks);
-			terms += r.m_recv[i];
-			for(j=r.m_recv[i++]; j>0; j--) i += 1 + r.m_recv[i];
-		}
-		Buffer<uint> recvs(iranks, 0);
-		Buffer< Buffer<pair<uint,uint> > > recv(iranks);
-		Buffer< Buffer<pair<uint,pair<L,R> > > > term(terms);
-		terms = 0;
-		for(i=0,n=0; i<l.m_recv.size(); ) {
-			const uint ranki = l.m_recv[i++];
-			const uint ii = irank.findFirst(ranki, iranks);
-			Buffer<uint> buf(l.m_recv[i++]);
-			recvMPI(&buf[0], buf.size() * sizeof(uint), ranki, 0);
-			for(j=0; j<buf.size(); j++) {
-				recv[ii].gather(pair<uint,uint>(buf[j], terms), recvs[ii]);
-				Buffer<pair<uint,pair<L,R> > > &termj = term[terms++];
-				termj.resize(l.m_recv[i++]);
-				for(k=0; k<termj.size(); k++,i++,n++) termj[k] = pair<uint,pair<L,R> >(lto[l.m_recv[i]], pair<L,R>(l.m_rval[n], r.m_zero));
-			}
-		}
-		for(i=0,n=0; i<r.m_recv.size(); ) {
-			const uint ranki = r.m_recv[i++];
-			const uint ii = irank.findFirst(ranki, iranks);
-			Buffer<uint> buf(r.m_recv[i++]);
-			recvMPI(&buf[0], buf.size() * sizeof(uint), ranki, 1);
-			for(j=0; j<buf.size(); j++) {
-				for(k=0; k<recvs[ii]; k++) {
-					if(recv[ii][k].first == buf[j]) break;
-				}
-				if(k < recvs[ii]) { // insert into existing term
-					Buffer<pair<uint,pair<L,R> > > &termj = term[recv[ii][k].second];
-					for(k=r.m_recv[i++]; k>0; k--,i++, n++) {
-						const uint rtoi = rto[r.m_recv[i]];
-						for(m=0; m<termj.size() && termj[m].first!=rtoi; m++);
-						if(m < termj.size()) termj[m].second.second = r.m_rval[n];
-						else termj.push_back(pair<uint,pair<L,R> >(rtoi, pair<L,R>(l.m_zero, r.m_rval[n])));
-					}
-				}
-				else { // create new term
-					recv[ii].gather(pair<uint,uint>(buf[j], terms), recvs[ii]);
-					Buffer<pair<uint,pair<L,R> > > &termj = term[terms++];
-					termj.resize(r.m_recv[i++]);
-					for(k=0; k<termj.size(); k++,i++,n++) termj[k] = pair<uint,pair<L,R> >(rto[r.m_recv[i]], pair<L,R>(l.m_zero, r.m_rval[n]));
-				}
-			}
-		}
-		for(i=0,m=0,n=0; i<iranks; i++) {
-			m += 2;
-			for(j=0; j<recvs[i]; j++) {
-				const uint sizej = term[recv[i][j].second].size();
-				m += 1 + sizej;
-				n += sizej;
-			}
-		}
-		m_recv.clear();
-		m_recv.resize(m);
-		m_rval.clear();
-		m_rval.resize(n);
-		for(i=0,m=0,n=0; i<iranks; i++) {
-			m_recv[m++] = irank[i];
-			m_recv[m++] = recvs[i];
-			for(j=0; j<recvs[i]; j++) {
-				const Buffer<pair<uint,pair<L,R> > > &termj = term[recv[i][j].second];
-				m_recv[m++] = termj.size();
-				for(k=0; k<termj.size(); k++,m++,n++) {
-					m_recv[m] = termj[k].first;
-					func(m_rval[n], termj[k].second.first, termj[k].second.second);
-				}
-			}
-		}
-		recv.clear();
-		term.clear();
-		return *this;
-	}
-	template<typename L, typename R> Sparse &setUnion(const Sparse<L> &l, const Diagonal<R> &r, void (*func)(T &, const L &, const R &)) {
-		if(orMPI(l.m_width != r.m_height || l.m_height != r.m_height)) return setEmpty(); // the dimensions do not match
-		m_width = l.m_width;
-		this->m_height = l.m_height;
-		Buffer<uint> beg;
-		Buffer<uint> row;
-		uint cols = 0;
-		Buffer<uint> col(l.m_col.size() + r.m_val.size());
-		Buffer<T> val(col.size());
-		Buffer<uint> lto(l.m_beg.size());
-		if(l.m_full) {
-			beg.resize(l.m_height);
-			if(r.m_full) { // both l and r are full
-				for(uint i=0; i<l.m_height; i++) {
-					beg[i] = cols;
-					lto[i] = i;
-					mergeRow(l, i, r, i, val, col, cols, func);
-				}
-			}
-			else { // only l is full
-				uint i = 0, ri = 0;
-				while(ri < r.m_row.size()) {
-					while(i < r.m_row[ri]) {
-						beg[i] = cols;
-						lto[i] = i;
-						mergeRow(l, i++, r, uint(-1), val, col, cols, func);
-					}
-					beg[i] = cols;
-					lto[i] = i;
-					mergeRow(l, i++, r, ri++, val, col, cols, func);
-				}
-				while(i < l.m_height) {
-					beg[i] = cols;
-					lto[i] = i;
-					mergeRow(l, i++, r, uint(-1), val, col, cols, func);
-				}
-			}
-			this->m_full = true;
-		}
-		else if(r.m_full) { // only r is full
-			beg.resize(r.m_height);
-			uint i=0, li = 0;
-			while(li < l.m_row.size()) {
-				while(i < l.m_row[li])  {
-					beg[i] = cols;
-					mergeRow(l, uint(-1), r, i++, val, col, cols, func);
-				}
-				beg[i] = cols;
-				lto[li] = i;
-				mergeRow(l, li++, r, i++, val, col, cols, func);
-			}
-			while(i < r.m_height) {
-				beg[i] = cols;
-				mergeRow(l, uint(-1), r, i++, val, col, cols, func);
-			}
-			this->m_full = true;
-		}
-		else { // both l and r are sparse
-			uint rowsize = l.m_row.size() + r.m_row.size();
-			if(rowsize > l.m_height) rowsize = l.m_height;
-			row.resize(rowsize);
-			beg.resize(rowsize);
-			uint i = 0, li = 0, ri = 0;
-			while(li < l.m_row.size() && ri < r.m_row.size()) {
-				beg[i] = cols;
-				if(l.m_row[li] < r.m_row[ri]) {
-					lto[li] = i;
-					row[i++] = l.m_row[li];
-					mergeRow(l, li++, r, uint(-1), val, col, cols, func);
-				}
-				else if(l.m_row[li] > r.m_row[ri]) {
-					row[i++] = r.m_row[ri];
-					mergeRow(l, uint(-1), r, ri++, val, col, cols, func);
-				}
-				else {
-					lto[li] = i;
-					row[i++] = l.m_row[li];
-					mergeRow(l, li++, r, ri++, val, col, cols, func);
-				}
-			}
-			while(li < l.m_row.size()) {
-				beg[i] = cols;
-				lto[li] = i;
-				row[i++] = l.m_row[li];
-				mergeRow(l, li++, r, uint(-1), val, col, cols, func);
-			}
-			while(ri < r.m_row.size()) {
-				beg[i] = cols;
-				row[i++] = r.m_row[ri];
-				mergeRow(l, uint(-1), r, ri++, val, col, cols, func);
-			}
-			beg.resize(i);
-			row.resize(i);
-			this->m_full = false;
-		}
-		val.resize(cols);
-		col.resize(cols);
-		this->m_row.swap(row);
-		m_beg.swap(beg);
-		m_col.swap(col);
-		this->m_val.swap(val);
-		row.clear();
-		beg.clear();
-		col.clear();
-		val.clear();
-		// initialize send, recv and rval
-		if(this != (void*)&l) {
-			m_send = l.m_send;
-			m_recv.resize(l.m_recv.size());
-			m_rval.resize(l.m_rval.size());
-		}
-		uint i, j, k;
-		for(i=0; i<m_recv.size(); )	{
-			m_recv[i] = l.m_recv[i];
-			i++;
-			m_recv[i] = l.m_recv[i];
-			for(j=m_recv[i++]; j>0; j--) {
-				m_recv[i] = l.m_recv[i];
-				for(k=m_recv[i++]; k>0; k--,i++) {
-					m_recv[i] = lto[l.m_recv[i]];
-				}
-			}
-		}
-		for(i=0; i<m_rval.size(); i++) func(m_rval[i], l.m_rval[i], r.m_zero);
 		return *this;
 	}
 	template<typename R> pair<uint,R> getTerm(const pair<uint,uint> &ext, const R &val, const uint locs, map<pair<uint,uint>,uint> &exts) const {
@@ -1266,7 +1266,7 @@ protected:
 			}
 		}
 	}
-	template<typename L, typename R> void mergeRow(const Sparse<L> &l, const uint li, const Diagonal<R> &r, const uint ri, Buffer<T> &val, Buffer<uint> &col, uint &cols, void (*func)(T &, const L &, const R &)) {
+	template<typename L, typename R> void mergeRow(const Sparse<L> &l, const uint li, const Diagonal<R> &r, const uint ri, Buffer<T> &val, Buffer<uint> &col, uint &cols, T func(const L &, const R &)) {
 		uint lj = 0, l_end = 0;
 		if(li < l.m_beg.size()) {
 			lj = l.m_beg[li];
@@ -1275,28 +1275,28 @@ protected:
 		if(ri < r.m_val.size()) {
 			const uint rcol = (r.m_full ? ri : r.m_row[ri]);
 			while(lj < l_end && l.m_col[lj] < rcol) {
-				func(val[cols], l.m_val[lj], r.m_zero);
+				val[cols] = func(l.m_val[lj], r.m_zero);
 				col[cols] = l.m_col[lj];
 				cols++; lj++;
 			}
 			if(lj < l_end && l.m_col[lj] == rcol) {
-				func(val[cols], l.m_val[lj], r.m_val[ri]);
+				val[cols] = func(l.m_val[lj], r.m_val[ri]);
 				col[cols] = rcol;
 				cols++; lj++;
 			}
 			else {
-				func(val[cols], l.m_zero, r.m_val[ri]);
+				val[cols] = func(l.m_zero, r.m_val[ri]);
 				col[cols] = rcol;
 				cols++;
 			}
 		}
 		while(lj < l_end) {
-			func(val[cols], l.m_val[lj], r.m_zero);
+			val[cols] = func(l.m_val[lj], r.m_zero);
 			col[cols] = l.m_col[lj];
 			cols++; lj++;
 		}
 	}
-	template<typename L, typename R> void mergeRow(const Sparse<L> &l, const uint li, const Sparse<R> &r, const uint ri, Buffer<T> &val, Buffer<uint> &col, uint &cols, void (*func)(T &, const L &, const R &)) {
+	template<typename L, typename R> void mergeRow(const Sparse<L> &l, const uint li, const Sparse<R> &r, const uint ri, Buffer<T> &val, Buffer<uint> &col, uint &cols, T func(const L &, const R &)) {
 		uint lj = 0, rj = 0;
 		uint l_end = 0, r_end = 0;
 		if(li < l.m_beg.size()) {
@@ -1309,28 +1309,28 @@ protected:
 		}
 		while(lj < l_end && rj < r_end) {
 			if(l.m_col[lj] < r.m_col[rj]) {
-				func(val[cols], l.m_val[lj], r.m_zero);
+				val[cols] = func(l.m_val[lj], r.m_zero);
 				col[cols] = l.m_col[lj];
 				cols++; lj++;
 			}
 			else if(l.m_col[lj] > r.m_col[rj]) {
-				func(val[cols], l.m_zero, r.m_val[rj]);
+				val[cols] = func(l.m_zero, r.m_val[rj]);
 				col[cols] = r.m_col[rj];
 				cols++; rj++;
 			}
 			else {
-				func(val[cols], l.m_val[lj], r.m_val[rj]);
+				val[cols] = func(l.m_val[lj], r.m_val[rj]);
 				col[cols] = l.m_col[lj];
 				cols++; lj++; rj++;
 			}
 		}
 		while(lj < l_end) {
-			func(val[cols], l.m_val[lj], r.m_zero);
+			val[cols] = func(l.m_val[lj], r.m_zero);
 			col[cols] = l.m_col[lj];
 			cols++; lj++;
 		}
 		while(rj < r_end) {
-			func(val[cols], l.m_zero, r.m_val[rj]);
+			val[cols] = func(l.m_zero, r.m_val[rj]);
 			col[cols] = r.m_col[rj];
 			cols++; rj++;
 		}
@@ -1406,6 +1406,14 @@ template<typename L, typename R, typename O = decltype(declval<L &>() * declval<
 template<typename L, typename R, typename O = decltype(declval<L &>() * declval<R &>())> Sparse<O> operator*(const Diagonal<L> &l, const Sparse<R> &r) {
 	Sparse<O> o(l.m_zero * r.m_zero);
 	return o.setTimes(l, r);
+}
+template<typename L, typename R, typename O = decltype(declval<L &>() * declval<R &>())> Sparse<O> scaled(const Sparse<L> &l, const R &r) {
+	Sparse<O> o(l.m_zero * r);
+	return o.setScale(l, r);
+}
+template<typename L, typename R, typename O = decltype(declval<L &>() * declval<R &>())> Sparse<O> scaled(const L &l, const Sparse<R> &r) {
+	Sparse<O> o(l * r.m_zero);
+	return o.setScale(l, r);
 }
 template<typename R> Sparse<R> operator-(const Sparse<R> &r) {
 	Sparse<R> o(r.m_zero);

@@ -25,6 +25,14 @@ inline bool FormGradeIsPrim(const FormGrade grade) { return bool(~grade & 1); }
 inline bool FormGradeIsDual(const FormGrade grade) { return bool(grade & 1); }
 inline FormGrade FormGradeDual(const FormGrade grade) { return FormGrade(grade ^ 1); }
 inline FormGrade FormGradeDeriv(const FormGrade grade) { return FormGrade(FormGradeIsPrim(grade) ? grade + 2 : grade - 2); }
+inline uint FormGradeVectorDimension(const FormGrade grade, const uint dim) { 
+	switch (FormGradeDimension(grade)) {
+	case 1: return dim;
+	case 2: return dim * (dim - 1) / 2;
+	case 3: return dim * (dim - 1) * (dim - 2) / 6;
+	default: return 1; // cases 0 and 4
+	}
+}
 
 template <typename T> using Form = Column<T>;
 template <typename T> using Hodge = Diagonal<T>;

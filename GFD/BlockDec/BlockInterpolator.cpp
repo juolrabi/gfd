@@ -28,8 +28,8 @@ void BlockInterpolator::init(const FormGrade grade, const PartMesh &mesh, const 
 
 	m_d = d;
 	m_dim = mesh.getDimension();
-	m_fields = BlockIntegrator::getFieldDimension(grade, m_dim);
-	m_values = block.getNumberOfLocalValues();
+	m_fields = FormGradeVectorDimension(grade, m_dim);
+	m_values = block.getLocals();
 	const Buffer<bool> ignore = getBoundaries(mesh, grade);
 
 	// init m_order and m_getter
@@ -44,50 +44,28 @@ void BlockInterpolator::init(const FormGrade grade, const PartMesh &mesh, const 
 		w[i].toVectorN(m_order * m_fields);
 		if(i < ignore.size() && ignore[i]) continue;
 
-		const Buffer<double> &setteri = block.getIntegrationData(i);
-
-		for(j=0; j<setteri.size();) {
-			Vector4 p(setteri[j++],0,0,0);
-			if(m_dim >= 2) p.y = setteri[j++];
-			if(m_dim >= 3) p.z = setteri[j++];
-			if(m_dim >= 4) p.t = setteri[j++];
-			const VectorN vj = getOrderFactors(p);
-			const VectorN wj = getWeight(p) * vj;
-			for(k=0; k<m_fields; k++) {
-				const double setterik = setteri[j++];
-				for(l=0; l<m_order; l++) {
-					const uint ll = l * m_fields + k;
-					v[i][ll] += setterik * vj[l];
-					w[i][ll] += setterik * wj[l];
+		const Quadrature &q = block.getQuadrature(i);
+		for(uint qs=0; qs<q.size();) {
+			const double *qv = &q[qs];
+			qs += q.vdim();
+			for(j=0; j<q.pcount(); j++) {
+				Vector4 p(q[qs++],0,0,0);
+				if(m_dim >= 2) p.y = q[qs++];
+				if(m_dim >= 3) p.z = q[qs++];
+				if(m_dim >= 4) p.t = q[qs++];
+				const VectorN vj = getOrderFactors(p);
+				const VectorN wj = getWeight(p) * vj;
+				uint jj = 0;
+				for(k=0; k<m_order; k++) {
+					for(l=0; l<m_fields; l++, jj++) {
+						v[i][jj] += qv[l] * vj[k];
+						w[i][jj] += qv[l] * wj[k];
+					}
 				}
 			}
 		}
 		A += w[i].outerProduct(v[i]);
-
-
-/*		VectorN vi, wi;
-		//double sum = 0.0;
-		for(j=m_fields; j<setteri.size();) {
-			const double fac = setteri[j++];
-			//sum += fac;
-			Vector4 p(setteri[j++],0,0,0);
-			if(m_dim >= 2) p.y = setteri[j++];
-			if(m_dim >= 3) p.z = setteri[j++];
-			if(m_dim >= 4) p.t = setteri[j++];
-			const VectorN vj = fac * getOrderFactors(p);
-			vi += vj;
-			wi += getWeight(p) * vj;
-		}
-		//std::cout << sum << std::endl;
-		for(j=0; j<m_order; j++) {
-			const uint jfields = j * m_fields;
-			for(k=0; k<m_fields; k++) {
-				v[i][jfields + k] += setteri[k] * vi[j];
-				w[i][jfields + k] += setteri[k] * wi[j];
-			}
-		}
-		A += w[i].outerProduct(v[i]);
-*/	}
+	}
 
 	while(true) {
 		// initialize m_getter

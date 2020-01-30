@@ -39,6 +39,22 @@ namespace gfd
 	}
 };
 */
+template<typename T> class Couple {
+public:
+	Couple() { }
+	Couple(const T &aa, const T &bb) { a = aa; b = bb; }
+	Couple &operator+=(const Couple &c) { a += c.a; b += c.b; return (*this); }
+	Couple operator+(const Couple &c) const { return Couple(a + c.a, b + c.b); }
+	Couple &operator-=(const Couple &c) { a -= c.a; b -= c.b; return (*this); }
+	Couple operator-(const Couple &c) const { return Couple(a - c.a, b - c.b); }
+	bool operator==(const Couple &c) { return a == c.a && b == c.b; }
+	bool operator<(const Couple &c) { return a < c.a || (a == c.a && b < c.b); }
+	bool operator>(const Couple &c) { return a > c.a || (a == c.a && b > c.b); }
+	T a;
+	T b;
+};
+
+
 typedef char sign;
 typedef unsigned char uchar;
 typedef unsigned short ushort;

@@ -166,6 +166,7 @@ public:
 	TwoVector3(const double vxy, const double vxz, const double vyz) { xy = vxy; xz = vxz; yz = vyz; }
 	TwoVector3(const TwoVector2 &v, const double vxz, const double vyz) { xy = v.xy; xz = vxz; yz = vyz; }
 	TwoVector3(const TwoVector3 &v) { xy = v.xy; xz = v.xz; yz = v.yz; }
+	TwoVector3(const double vxy, const Vector2 &vt) { xy = vxy; xz = vt.x; yz = vt.y; }
 	TwoVector3(const Vector3 &v1, const Vector3 &v2)
 	{
 		xy = v1.x * v2.y - v1.y * v2.x;

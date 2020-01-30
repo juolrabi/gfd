@@ -19,23 +19,6 @@ using namespace std;
 namespace gfd
 {
 
-struct Uint4
-{
-	uint x;
-	uint y;
-	uint z;
-	uint t;
-	Uint4(const uint xx=0, const uint yy=0, const uint zz=0, const uint tt=0) { x = xx; y = yy; z = zz; t = tt; }
-	Uint4 &operator+=(const Uint4 &i) { x += i.x; y += i.y; z += i.z; t += i.t; return (*this); }
-	Uint4 operator+(const Uint4 &i) const { return Uint4(x + i.x, y + i.y, z + i.z, t + i.t); }
-	Uint4 &operator-=(const Uint4 &i) { x -= i.x; y -= i.y; z -= i.z; t -= i.t; return (*this); }
-	Uint4 operator-(const Uint4 &i) const { return Uint4(x - i.x, y - i.y, z - i.z, t - i.t); }
-	uint dot(const Uint4 &i) const { return x * i.x + y * i.y + z * i.z + t * i.t; }
-	Uint4 &operator*=(const uint j) { x *= j; y *= j; z *= j; t *= j; return (*this); }
-	Uint4 operator*(const uint j) const { return Uint4(j * x, j * y, j * z, j * t); }
-	friend Uint4 operator*(const uint j, const Uint4 &i) { return i * j; }
-};
-
 class Type
 {
 public:
@@ -102,7 +85,7 @@ public:
 
 	void toMesh(PartMesh &mesh) const;
 	Sparse<sign> &integrateDerivative(const FormGrade grade, Sparse<sign> &d) const;
-	template<typename T> Column<T> &integrateForm(void func(const Vector4 &, T *), const uint num, const FormGrade grade, Column<T> &result) const {
+	template<typename T> Column<T> &integrateForm(T func(const Buffer<double> &), const int num, const FormGrade grade, Column<T> &result) const {
 		// initialize form
 		const uint gdim = FormGradeDimension(grade);
 		const uint locs = getLocals(gdim);
@@ -115,8 +98,8 @@ public:
 		clearMap(blocks);
 		return result;
 	}
-	template<typename T> Diagonal<T> &integrateHodge(void func(const Vector4 &, T *), const uint num, const FormGrade grade, Diagonal<T> &result) const {
-		// initialize form
+	template<typename T> Diagonal<T> &integrateWedge(T func(const Buffer<double> &), const int num, const FormGrade grade, Diagonal<T> &result) const {
+		// initialize hodge
 		const uint gdim = FormGradeDimension(grade);
 		const uint locs = getLocals(gdim);
 		if(!result.m_full || result.m_height != locs) result.setFullOfZeros(locs);
@@ -126,17 +109,17 @@ public:
 		createWedgeIntegrator(grade, blocks, num);
 		integrate(func, blocks, gdim, true, result);
 		clearMap(blocks);
-
-		// divide by vector square
-		Buffer<double> v;
-		const uint fields = getVectors(grade, v);
-		for(uint j=0; j<locs; j++) {
-			double sum = 0.0;
-			const uint jj = fields * j;
-			for(uint k=0; k<fields; k++) sum += v[jj + k] * v[jj + k];
-			result.m_val[j] /= sum;
-		}
 		return result;
+	}
+	template<typename T> Diagonal<T> &integrateHodge(T func(const Buffer<double> &), const int num, const FormGrade grade, Diagonal<T> &result) const {
+		integrateWedge(func, num, grade, result);
+		switch(FormGradeVectorDimension(grade, m_dim)) {
+		case 1: return divideByVectorSquare(FormTwoVector2, TwoVector2(0), grade, result);
+		case 2: return divideByVectorSquare(FormVector2, Vector2(0,0), grade, result);
+		case 3: return divideByVectorSquare(FormVector3, Vector3(0,0,0), grade, result);
+		case 4: return divideByVectorSquare(FormVector4, Vector4(0,0,0,0), grade, result);
+		default: return divideByVectorSquare(FormTwoVector4, TwoVector4(0,0,0,0,0,0), grade, result);
+		}
 	}
 	template<typename T> Buffer<T> interpolateForm(const FormGrade grade, const Column<T> &form, const Vector4 &p) { return interpolateForm(form, p, Buffer<T>()); }
 	template<typename T> Buffer<T> &interpolateForm(const FormGrade grade, const Column<T> &form, const Vector4 &p, Buffer<T> &result) {
@@ -144,7 +127,7 @@ public:
 		createInterpolator(grade);
 
 		// initialize result
-		result.resize(BlockIntegrator::getFieldDimension(grade, m_dim));
+		result.resize(FormGradeVectorDimension(grade, m_dim));
 		result.fill(form.m_zero);
 
 		// find block
@@ -288,7 +271,7 @@ protected:
 	const Vector4 getPosition(const Uint4 &i) const { return Vector4(m_p.x + i.x * m_d.x, m_p.y + i.y * m_d.y, m_p.z + i.z * m_d.z, m_p.t + i.t * m_d.t); }
 	uint getBlockId(const Uint4 &i) const { return ((i.t * m_s.z + i.z) * m_s.y + i.y) * m_s.x + i.x; }
 
-	uint getVectors(const FormGrade grade, Buffer<double> &result) const;
+//	uint integrateVectors(const FormGrade grade, Buffer<double> &result) const;
 
 	void synchronizeNeighbors(const Uint4 &i0, const Uint4 &i1);
 	ullong getWeight(Uint4 i0, Uint4 i1, const uchar *type, const Uint4 &s, const uint rank0, const uint rank1);
@@ -329,8 +312,8 @@ protected:
 	Buffer<uint> getFaceLinks(const Uint4 &i, const uint part) const;
 	Buffer<uint> getBodyLinks(const Uint4 &i, const uint part) const;
 
-	void createFormIntegrator(const FormGrade grade, map<Type, BlockIntegrator*> &blocks, const uint num) const;
-	void createWedgeIntegrator(const FormGrade grade, map<Type, BlockIntegrator*> &blocks, const uint num) const;
+	void createFormIntegrator(const FormGrade grade, map<Type, BlockIntegrator*> &blocks, const int num) const;
+	void createWedgeIntegrator(const FormGrade grade, map<Type, BlockIntegrator*> &blocks, const int num) const;
 	void createInterpolator(const FormGrade grade);
 
 	void addEdgeIncidences(const PartMesh *part, const uint e, const Uint4 &i, Buffer< pair<uint,sign> > &inc) const;
@@ -356,7 +339,7 @@ protected:
 	Buffer<uint> getPrevRanks() const;
 	Buffer<uint> getNextRanks() const;
 
-	template<typename T> void integrate(void func(const Vector4 &, T *result), const map<Type, BlockIntegrator*> &blocks, const uint gdim, const bool dual, Discrete<T> &result) const
+	template<typename T> void integrate(T func(const Buffer<double> &), const map<Type, BlockIntegrator*> &blocks, const uint gdim, const bool dual, Discrete<T> &result) const
 	{
 		// reserve space for external terms
 		Buffer< pair<uint,uint> > ext;
@@ -376,7 +359,7 @@ protected:
 						const BlockIntegrator *block = blocks.find(getType(ii))->second;
 						if(dual)
 						{
-							const Buffer< pair<uint,uint> > &pext = block->getExternal();
+							const Buffer< pair<uint,uint> > &pext = block->getExternals();
 							if(term.size() < pext.size()) term.resize(pext.size());
 							for(j=0; j<pext.size(); j++)
 							{
@@ -406,8 +389,13 @@ protected:
 			}
 		}
 	}
-	template<typename T> void sumInterpolation(const FormGrade grade, const Column<T> &form, const Vector4 &p, const Uint4 &i, T *result) const
-	{
+	template<typename T, typename V> Diagonal<T> &divideByVectorSquare(V func(const Buffer<double> &), const V &zero, const FormGrade grade, Diagonal<T> &result) const {
+		Column<V> vec(result.m_height, zero);
+		integrateForm(func, 0, grade, vec);
+		for(uint j=0; j<result.m_height; j++) result.m_val[j] /= vec.m_val[j].lensq();
+		return result;
+	}
+	template<typename T> void sumInterpolation(const FormGrade grade, const Column<T> &form, const Vector4 &p, const Uint4 &i, T *result) const {
 		const uint ii = getBlockId(i);
 		const Vector4 d(p - getPosition(i));
 		const uint gdim = FormGradeDimension(grade);
@@ -418,17 +406,9 @@ protected:
 		else if(gdim == 3) poly->interpolate(d, &form.m_val[m_bbeg[ii]], result);
 		else poly->interpolate(d, &form.m_val[m_qbeg[ii]], result);
 	}
-	template<typename Key, typename Link> void clearMap(map<Key,Link*> &mapi) const
-	{
-		typename map<Key,Link*>::iterator it = mapi.begin();
-		while(it != mapi.end())
-		{
-			if(it->second != NULL)
-			{
-				delete it->second;
-				it->second;
-			}
-			it++;
+	template<typename Key, typename Link> void clearMap(map<Key,Link*> &mapi) const {
+		for(auto it=mapi.begin(); it!= mapi.end(); it++) {
+			if(it->second != NULL) delete it->second;
 		}
 		mapi.clear();
 	}

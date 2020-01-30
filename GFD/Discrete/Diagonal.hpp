@@ -28,7 +28,7 @@ public:
 	// print functions
 	void printData() const {
 		cout << "Diagonal matrix:" << endl;
-		Discrete<T>::printVectorData();
+		Discrete<T>::printData();
 	}
 	void printShape() const {
 		uint i, j, k;
@@ -36,7 +36,7 @@ public:
 		const uint ranks = getMPIranks();
 		uint col0 = 0;
 		for(k=0; k<ranks; k++) {
-			Discrete<T>::getVectorFromRank(k, 0, data);
+			Discrete<T>::getFromRank(k, 0, data);
 			for(i=0; i<data.m_height; i++) {
 				for(j=0; j<col0; j++) cout << "  ";
 				uint row = i;
@@ -55,35 +55,35 @@ public:
 	}
 
 	// set functions
-	Diagonal &setFullOfZeros(const uint height) { Discrete<T>::setVectorFullOfZeros(height); return *this; }
-	Diagonal &setFull(const Buffer<T> &val) { Discrete<T>::setVectorFull(val); return *this; }
-	Diagonal &setSparse(const uint height, const Buffer< pair<uint, T> > &val) { Discrete<T>::setVectorSparse(height, val); return *this; }
-	template<typename R> Diagonal &setCopy(const Diagonal<R> &r) { Discrete<T>::setVectorCopy(r); return *this; }
-	template<typename R> Diagonal &setNegation(const Diagonal<R> &r) { Discrete<T>::setVectorNegation(r); return *this; }
-	template<typename L, typename R> Diagonal &setPlus(const Diagonal<L> &l, const Diagonal<R> &r) { Discrete<T>::setVectorPlus(l, r); return *this; }
-	template<typename L, typename R> Diagonal &setMinus(const Diagonal<L> &l, const Diagonal<R> &r) { Discrete<T>::setVectorMinus(l, r); return *this; }
-	template<typename L, typename R> Diagonal &setTimes(const Diagonal<L> &l, const Diagonal<R> &r) { Discrete<T>::setVectorTimes(l, r); return *this; }
-	template<typename L, typename R> Diagonal &setScaleRight(const Diagonal<L> &l, const R &r) { Discrete<T>::setVectorScaleRight(l, r); return *this; }
-	template<typename L, typename R> Diagonal &setScaleLeft(const L &l, const Diagonal<R> &r) { Discrete<T>::setVectorScaleLeft(l, r); return *this; }
+	Diagonal &setFullOfZeros(const uint height) { Discrete<T>::setFullOfZeros(height); return *this; }
+	Diagonal &setFull(const Buffer<T> &val) { Discrete<T>::setFull(val); return *this; }
+	Diagonal &setSparse(const uint height, const Buffer< pair<uint, T> > &val = Buffer< pair<uint, T> >()) { Discrete<T>::setSparse(height, val); return *this; }
+	template<typename R> Diagonal &setCopy(const Diagonal<R> &r) { Discrete<T>::setCopy(r); return *this; }
+	template<typename R> Diagonal &setFunction(const Diagonal<R> &r, T func(const R &)) { Discrete<T>::setFunction(r, func); return *this; }
+	template<typename R> Diagonal &setNegation(const Diagonal<R> &r) { Discrete<T>::setNegation(r); return *this; }
+	template<typename R> Diagonal &setInverse(const Diagonal<R> &r) { Discrete<T>::setInverse(r); return *this; }
+	template<typename L, typename R> Diagonal &setUnion(const Diagonal<L> &l, const Diagonal<R> &r, T func(const L &, const R &)) { Discrete<T>::setUnion(l, r, func); return *this; }
+	template<typename L, typename R> Diagonal &setIntersection(const Diagonal<L> &l, const Diagonal<R> &r, T func(const L &, const R &)) { Discrete<T>::setIntersection(l, r, func); return *this; }
+	template<typename L, typename R> Diagonal &setPlus(const Diagonal<L> &l, const Diagonal<R> &r) { Discrete<T>::setPlus(l, r); return *this; }
+	template<typename L, typename R> Diagonal &setMinus(const Diagonal<L> &l, const Diagonal<R> &r) { Discrete<T>::setMinus(l, r); return *this; }
+	template<typename L, typename R> Diagonal &setTimes(const Diagonal<L> &l, const Diagonal<R> &r) { Discrete<T>::setTimes(l, r); return *this; }
+	template<typename L, typename R> Diagonal &setScale(const Diagonal<L> &l, const R &r) { Discrete<T>::setScale(l, r); return *this; }
+	template<typename L, typename R> Diagonal &setScale(const L &l, const Diagonal<R> &r) { Discrete<T>::setScale(l, r); return *this; }
 
 	// modifier functions
 	template<typename R> Diagonal &operator+=(const Diagonal<R> &r) { return setPlus(*this, r); }
 	template<typename R> Diagonal &operator-=(const Diagonal<R> &r) { return setMinus(*this, r); }
 	template<typename R> Diagonal &operator*=(const Diagonal<R> &r) { return setTimes(*this, r); }
-	template<typename R> Diagonal &scaleRight(const R &r) { return setScaleRight(*this, r); }
-	template<typename L> Diagonal &scaleLeft(const L &l) { return setScaleLeft(l, *this); }
+	template<typename R> Diagonal &scale(const R &r) { return setScale(*this, r); }
 
 	// trim functions
-	Diagonal &trimFull() { Discrete<T>::trimVectorFull(); return *this; } // convert sparse to full
-	Diagonal &trimSparse() { Discrete<T>::trimVectorSparse(); return *this; } // convert full to sparse
-	Diagonal &trim() { Discrete<T>::trimVector(); return *this; } // remove all zero instances
+	Diagonal &trimFull() { Discrete<T>::trimFull(); return *this; } // convert sparse to full
+	Diagonal &trimSparse() { Discrete<T>::trimSparse(); return *this; } // convert full to sparse
+	Diagonal &trim() { Discrete<T>::trim(); return *this; } // remove all zero instances
 
 	// get functions
-	Buffer<T> getBuffer() const { return Discrete<T>::getVectorBuffer(); } // return diagonal values in the format of Buffer<T>
-	const T &getValue(const uint i, const uint j) const {
-		if(i == j) return Discrete<T>::getVectorValue(i);
-		return this->m_zero;
-	}
+	Buffer<T> getBuffer() const { return Discrete<T>::getBuffer(); } // return diagonal values in the format of Buffer<T>
+	const T &getValue(const uint i) const { return Discrete<T>::getValue(i); }
 
 };
 
@@ -99,6 +99,14 @@ template<typename L, typename R, typename O = decltype(declval<L &>() - declval<
 template<typename L, typename R, typename O = decltype(declval<L &>() * declval<R &>())> Diagonal<O> operator*(const Diagonal<L> &l, const Diagonal<R> &r) {
 	Diagonal<O> o(l.m_zero * r.m_zero);
 	return o.setTimes(l, r);
+}
+template<typename L, typename R, typename O = decltype(declval<L &>() * declval<R &>())> Diagonal<O> scaled(const Diagonal<L> &l, const R &r) {
+	Diagonal<O> o(l.m_zero * r);
+	return o.setScale(l, r);
+}
+template<typename L, typename R, typename O = decltype(declval<L &>() * declval<R &>())> Diagonal<O> scaled(const L &l, const Diagonal<R> &r) {
+	Diagonal<O> o(l * r.m_zero);
+	return o.setScale(l, r);
 }
 template<typename R> Diagonal<R> operator-(const Diagonal<R> &r) {
 	Diagonal<R> o(r.m_zero);

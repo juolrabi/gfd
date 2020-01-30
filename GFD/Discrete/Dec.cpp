@@ -28,44 +28,20 @@ void Dec::setHighDimension(const uint highdim) {
 	if(m_highdim > 4) m_highdim = 4;
 }
 
-void Dec::mergesumExternals(const Buffer< pair<uint,uint> > &ext, Buffer< Buffer<double> > &q) const {
-	Buffer<double> *extq = &q[q.size() - ext.size()];
+void Dec::combineExternals(const Buffer< pair<uint,uint> > &ext, Buffer<Quadrature> &q) const {
+	Quadrature *extq = &q[q.size() - ext.size()];
 	const Buffer< pair<uint,uint> > mext = getMyExternals(ext);
 	const uint rank = getMPIrank();
 	for(uint i=0; i<ext.size(); i++) {
-		Buffer<double> &buf = extq[i];
-		if(ext[i].first == rank) q[ext[i].second].mergesum(buf);
+		Quadrature &qi = extq[i];
+		if(ext[i].first == rank) q[ext[i].second].combine(qi);
 		else {
-			uint size = buf.size();
+			uint size = qi.size();
 			sendMPI(&size, sizeof(uint), ext[i].first, 0);
 			if(size == 0) continue;
-			sendMPI(&buf[0], size * sizeof(double), ext[i].first, 1);
+			sendMPI(&qi[0], size * sizeof(double), ext[i].first, 1);
 		}
-		buf.clear();
-	}
-	for(uint i=0; i<mext.size(); i++) {
-		uint size;
-		recvMPI(&size, sizeof(uint), mext[i].first, 0);
-		if(size == 0) continue;
-		Buffer<double> buf(size);
-		recvMPI(&buf[0], size * sizeof(double), mext[i].first, 1);
-		q[mext[i].second].mergesum(buf);
-	}
-}
-void Dec::combineExternals(const Buffer< pair<uint,uint> > &ext, Buffer< Buffer<double> > &q) const {
-	Buffer<double> *extq = &q[q.size() - ext.size()];
-	const Buffer< pair<uint,uint> > mext = getMyExternals(ext);
-	const uint rank = getMPIrank();
-	for(uint i=0; i<ext.size(); i++) {
-		Buffer<double> &buf = extq[i];
-		if(ext[i].first == rank) q[ext[i].second].combine(buf);
-		else {
-			uint size = buf.size();
-			sendMPI(&size, sizeof(uint), ext[i].first, 0);
-			if(size == 0) continue;
-			sendMPI(&buf[0], size * sizeof(double), ext[i].first, 1);
-		}
-		buf.clear();
+		qi.clear();
 	}
 	for(uint i=0; i<mext.size(); i++) {
 		uint size;
