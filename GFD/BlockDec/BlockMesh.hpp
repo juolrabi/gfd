@@ -85,7 +85,7 @@ public:
 
 	void toMesh(PartMesh &mesh) const;
 	Sparse<sign> &integrateDerivative(const FormGrade grade, Sparse<sign> &d) const;
-	template<typename T> Column<T> &integrateForm(T func(const Buffer<double> &), const int num, const FormGrade grade, Column<T> &result) const {
+	template<typename T> Diagonal<T> &integrateForm(T func(const Buffer<double> &), const int num, const FormGrade grade, Diagonal<T> &result) const {
 		// initialize form
 		const uint gdim = FormGradeDimension(grade);
 		const uint locs = getLocals(gdim);

@@ -148,6 +148,7 @@ public:
 	// trim functions
 	Column &trimFull() { Discrete<T>::trimFull(); return *this; } // convert sparse to full
 	Column &trimSparse() { Discrete<T>::trimSparse(); return *this; } // convert full to sparse
+	Column &trimOptimal(const double limit = 0.5) { Discrete<T>::trimOptimal(limit); return *this; } // convert to full if(number of non-empty rows > limit * m_height), otherwise convert to sparse
 	Column &trim() { Discrete<T>::trim(); return *this; } // remove all zero instances
 
 };

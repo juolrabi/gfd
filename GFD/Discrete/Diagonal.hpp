@@ -79,6 +79,7 @@ public:
 	// trim functions
 	Diagonal &trimFull() { Discrete<T>::trimFull(); return *this; } // convert sparse to full
 	Diagonal &trimSparse() { Discrete<T>::trimSparse(); return *this; } // convert full to sparse
+	Diagonal &trimOptimal(const double limit = 0.5) { Discrete<T>::trimOptimal(limit); return *this; } // convert to full if(number of non-empty rows > limit * m_height), otherwise convert to sparse
 	Diagonal &trim() { Discrete<T>::trim(); return *this; } // remove all zero instances
 
 	// get functions

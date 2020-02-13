@@ -1,5 +1,5 @@
 /**
- * Split.hpp implement split classes of Column, Diagonal, and Sparse.
+ * Split.hpp implements split classes of Column, Diagonal, and Sparse.
  * Author: Jukka Räbinä, University of Jyväskylä, 2019.
  */
 
@@ -71,7 +71,14 @@ template<typename T>
 class ColumnSplit : public Split
 {
 public:
-	template<typename R> ColumnSplit(const Buffer<uint> &lcat, const Column<R> &term) {
+	ColumnSplit() { }
+	template<typename R> ColumnSplit(const Column<R> &term) { init(term); }
+	template<typename R> ColumnSplit(const Buffer<uint> &lcat, const Column<R> &term) { init(lcat, term); }
+	template<typename R> void init(const Column<R> &term) {
+		m_term.resize(1);
+		m_term[0].setCopy(term);
+	}
+	template<typename R> void init(const Buffer<uint> &lcat, const Column<R> &term) {
 		m_term.resize(Split::getNumberOfTerms(lcat));
 		for(uint i=0; i<m_term.size(); i++) {
 			m_term[i].m_zero = term.m_zero;
@@ -97,21 +104,30 @@ template<typename T>
 class DiagonalSplit : public Split
 {
 public:
-	template<typename R> DiagonalSplit(const Buffer<uint> &lcat, const Diagonal<R> &term) {
+	DiagonalSplit() { }
+	template<typename R> DiagonalSplit(const Diagonal<R> &term) { init(term); }
+	template<typename R> DiagonalSplit(const Buffer<uint> &lcat, const Diagonal<R> &term) { init(lcat, term); }
+	template<typename R> DiagonalSplit(const Diagonal<R> &term, const Buffer<uint> &rcat) { init(term, rcat); }
+	template<typename R> DiagonalSplit(const Buffer<uint> &lcat, const Diagonal<R> &term, const Buffer<uint> &rcat) { init(lcat, term, rcat); }
+	template<typename R> void init(const Diagonal<R> &term) {
+		m_term.resize(1);
+		m_term[0].setCopy(term);
+	}
+	template<typename R> void init(const Buffer<uint> &lcat, const Diagonal<R> &term) {
 		m_term.resize(Split::getNumberOfTerms(lcat));
 		for(uint i=0; i<m_term.size(); i++) {
 			m_term[i].m_zero = term.m_zero;
 			m_term[i].setTimes(Split::getSplitter(lcat, i), term);
 		}
 	}
-	template<typename R> DiagonalSplit(const Diagonal<R> &term, const Buffer<uint> &rcat) {
+	template<typename R> void init(const Diagonal<R> &term, const Buffer<uint> &rcat) {
 		m_term.resize(Split::getNumberOfTerms(rcat));
 		for(uint i=0; i<m_term.size(); i++) {
 			m_term[i].m_zero = term.m_zero;
 			m_term[i].setTimes(term, Split::getSplitter(rcat, i));
 		}
 	}
-	template<typename R> DiagonalSplit(const Buffer<uint> &lcat, const Diagonal<R> &term, const Buffer<uint> &rcat) {
+	template<typename R> void init(const Buffer<uint> &lcat, const Diagonal<R> &term, const Buffer<uint> &rcat) {
 		const uint lterms = Split::getNumberOfTerms(lcat);
 		const uint rterms = Split::getNumberOfTerms(rcat);
 		m_term.resize(lterms > rterms ? lterms : rterms);
@@ -140,21 +156,31 @@ template<typename T>
 class SparseSplit : public Split
 {
 public:
-	template<typename R> SparseSplit(const Buffer<uint> &lcat, const Sparse<R> &term) {
+	SparseSplit() { }
+	template<typename R> SparseSplit(const Sparse<R> &term) { init(term); }
+	template<typename R> SparseSplit(const Buffer<uint> &lcat, const Sparse<R> &term) { init(lcat, term); }
+	template<typename R> SparseSplit(const Sparse<R> &term, const Buffer<uint> &rcat) { init(term, rcat); }
+	template<typename R> SparseSplit(const Buffer<uint> &lcat, const Sparse<R> &term, const Buffer<uint> &rcat) { init(lcat, term, rcat); }
+	template<typename R> void init(const Sparse<R> &term) {
+		m_term.resize(1);
+		m_term[0].setCopy(term);
+	}
+	template<typename R> void init(const Buffer<uint> &lcat, const Sparse<R> &term) {
 		m_term.resize(Split::getNumberOfTerms(lcat));
+	cout << "numberoftemrs" << m_term.size() << endl;
 		for(uint i=0; i<m_term.size(); i++) {
 			m_term[i].m_zero = term.m_zero;
 			m_term[i].setTimes(Split::getSplitter(lcat, i), term);
 		}
 	}
-	template<typename R> SparseSplit(const Sparse<R> &term, const Buffer<uint> &rcat) {
+	template<typename R> void init(const Sparse<R> &term, const Buffer<uint> &rcat) {
 		m_term.resize(Split::getNumberOfTerms(rcat));
 		for(uint i=0; i<m_term.size(); i++) {
 			m_term[i].m_zero = term.m_zero;
 			m_term[i].setTimes(term, Split::getSplitter(rcat, i));
 		}
 	}
-	template<typename R> SparseSplit(const Buffer<uint> &lcat, const Sparse<R> &term, const Buffer<uint> &rcat) {
+	template<typename R> void init(const Buffer<uint> &lcat, const Sparse<R> &term, const Buffer<uint> &rcat) {
 		const uint lterms = Split::getNumberOfTerms(lcat);
 		const uint rterms = Split::getNumberOfTerms(rcat);
 		m_term.resize(lterms > rterms ? lterms : rterms);

@@ -21,6 +21,7 @@ public:
 	// constructors
 	Sparse(const T &zero = 0) : Discrete<T>::Discrete(zero) { m_width = 0; } // initialize empty sparse matrix
 	template<typename R> Sparse(const Sparse<R> &r) : Discrete<T>::Discrete(r.m_zero) { setCopy(r); } // copy existing sparse matrix
+	template<typename R> Sparse(const Diagonal<R> &r) : Discrete<T>::Discrete(r.m_zero) { setDiagonal(r); } // copy diagonal matrix
 	Sparse(const uint width, const Buffer< Buffer< pair<uint, T> > > &val, const T &zero) : Discrete<T>::Discrete(zero) { setFull(width, val); } // initialize full sparse matrix
 	Sparse(const uint width, const uint height, const Buffer< pair<uint, Buffer< pair<uint, T> > > > &val, const T &zero) : Discrete<T>::Discrete(zero) { setSparse(width, height, val); } // initialize sparse sparse matrix
 	virtual ~Sparse() { }
@@ -207,6 +208,16 @@ public:
 		uint i;
 		for(i=0; i<this->m_val.size(); i++) this->m_val[i] = r.m_val[i];
 		for(i=0; i<m_rval.size(); i++) m_rval[i] = r.m_rval[i];
+		return *this;
+	}
+	template<typename R> Sparse &setDiagonal(const Diagonal<R> &r) {
+		setEmpty();
+		Discrete<T>::setCopy(r);
+		m_width = r.m_height;
+		m_beg.resize(r.m_val.size());
+		for(uint i=0; i<m_beg.size(); i++) m_beg[i] = i;
+		if(r.m_full) m_col = m_beg;
+		else m_col = r.m_row;
 		return *this;
 	}
 	template<typename R> Sparse &setFunction(const Sparse<R> &r, T func(const R &)) {
@@ -1066,21 +1077,7 @@ public:
 	// trim functions
 	Sparse &trimFull() { // convert sparse to full
 		if(this->m_full) return trim(); // already full
-		this->m_full = true;
-		uint i, j, k;
-		for(i=0; i<m_recv.size(); )	{
-			i++;
-			for(j=m_recv[i++]; j>0; j--) {
-				for(k=m_recv[i++]; k>0; k--,i++) m_recv[i] = this->m_row[m_recv[i]];
-			}
-		}
-		Buffer<uint> beg(this->m_height);
-		for(i=0,j=0; i<this->m_row.size(); i++) {
-			while(j <= this->m_row[i]) beg[j++] = m_beg[i];
-		}
-		while(j < this->m_height) beg[j++] = m_col.size();
-		m_beg.swap(beg);
-		this->m_row.clear();
+		sparseToFull();
 		return trim();
 	}
 	Sparse &trimSparse() { // convert full to sparse
@@ -1089,6 +1086,11 @@ public:
 		this->m_row.resize(this->m_height);
 		for(uint i=0; i<this->m_height; i++) this->m_row[i] = i;
 		return trim();
+	}
+	Sparse &trimOptimal(const double limit) { // convert to full if(number of non-empty rows > limit * m_height), otherwise convert to sparse
+		trimSparse();
+		if(double(this->m_row.size()) > limit * this->m_height) sparseToFull();
+		return *this;
 	}
 	Sparse &trim() { // remove all zero instances
 		uint i, j, k, l;
@@ -1367,6 +1369,23 @@ protected:
 		return *this;
 	}
 
+	void sparseToFull() {
+		this->m_full = true;
+		uint i, j, k;
+		for(i=0; i<m_recv.size(); )	{
+			i++;
+			for(j=m_recv[i++]; j>0; j--) {
+				for(k=m_recv[i++]; k>0; k--,i++) m_recv[i] = this->m_row[m_recv[i]];
+			}
+		}
+		Buffer<uint> beg(this->m_height);
+		for(i=0,j=0; i<this->m_row.size(); i++) {
+			while(j <= this->m_row[i]) beg[j++] = m_beg[i];
+		}
+		while(j < this->m_height) beg[j++] = m_col.size();
+		m_beg.swap(beg);
+		this->m_row.clear();
+	}
 
 };
 

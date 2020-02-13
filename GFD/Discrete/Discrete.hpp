@@ -304,6 +304,11 @@ protected:
 		for(uint i=0; i<m_height; i++) m_row[i] = i;
 		return trim();
 	}
+	Discrete &trimOptimal(const double limit) { // convert to full if(number of non-empty rows > limit * m_height), otherwise convert to sparse
+		trimSparse();
+		if(double(m_row.size()) > limit * m_height) trimFull();
+		return *this;
+	}
 	Discrete &trim() { // remove all zero instances from a sparse column vector
 		if(m_full) return *this; // not sparse
 		uint i, j;

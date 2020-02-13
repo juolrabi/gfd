@@ -33,6 +33,7 @@ double get1Form(const Buffer<double> &q) {
 }
 
 double sinWave(const double time) {
+//	return 200.0 * (time > 3.25 ? 1.0 : sin(PIx2 * time));
 	return 50.0 * sin(PIx2 * time);
 }
 double sourceVector(const Buffer<double> &q) {
@@ -241,7 +242,8 @@ int main()
 
 	// initialize forms and system matrices
 	Buffer< Form<double> > v(2, Form<double>(0.0));
-	v[0].setFullOfZeros(dh0.m_height);
+	//v[0].setFullOfZeros(dh0.m_height);
+	bm.integrateForm(get0Form, 1, fg_prim0, v[0]);
 	v[1].setFullOfZeros(h1.m_height);
 
 	Buffer< Sparse<double> > d(2, Sparse<double>(0.0));
@@ -266,13 +268,13 @@ int main()
 
 	Buffer< double (*)(const double) > func(1, sinWave);
 
-//	TimeIntegrator intg(d[0], a[0], d[1], a[1], f[0], 1.0);
 	TimeIntegrator intg(d, a, f, 1.0);
+//	TimeIntegrator intg(d, 1.0);
 	
 
 	for(uint k=0; k<=10; k++) {
-//		intg.integratePeriod(v[0], v[1], func[0]);
 		intg.integratePeriod(v, func);
+//		intg.integratePeriod(v);
 
 		Picture pic0(500,500);
 		Buffer<double> val;
@@ -285,8 +287,23 @@ int main()
 				pic0.setColor(i, j, col);
 			}
 		}
+		if(getMPIrank() == 0)
+		{
+			Text path;
+			path << "kuva" << k << ".bmp" << endl;
+			pic0.save(path.str(), true);
+		}
 	}
 
+	// compute check value
+	double check = 0.0;
+	Buffer<double> val(3, 0.0);
+	for(uint i=0; i<v[0].m_val.size(); i++) check += v[0].m_val[i];
+	for(uint i=0; i<v[1].m_val.size(); i++) check += v[1].m_val[i];
+	sumMPI(&check, 1);
+	if(getMPIrank() == 0) {
+		cout << "check = " << check << " = 246.182" << endl;
+	}
 
 
 

@@ -6,7 +6,7 @@ LIB := ../../GFD
 # c++ compiler and compiler flags
 CXX = mpicxx
 CXXFLAGS := -g -Wall -Wextra -pedantic -std=c++11
-
+N = 1
 
 # commands for insert and delete folder
 MKDIR_P ?= mkdir -p
@@ -31,4 +31,6 @@ clean:
 	$(RMDIR_R) $(BUILD)
 run: $(BUILD)/$(TARGET)
 	cd $(BUILD); ./$(TARGET); cd ../
+mpirun: $(BUILD)/$(TARGET)
+	cd $(BUILD); mpirun -np $(N) ./$(TARGET); cd ../
 

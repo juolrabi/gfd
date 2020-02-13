@@ -8,6 +8,17 @@ The development of the library has been active and in use since 2012 and is stil
 
 The code in this repository is free software and licensed under the GNU General Public License version 3.
 
+The programs are developed and run with Linux (Ubuntu). To build and run the code you need to install following packages:
+- sudo apt install make
+- sudo apt install g++
+- sudo apt install libopenmpi-dev
+
+The program samples can be built and run with following commands: 
+- make: to build
+- make run: to build and run
+- make mpirun N: to run with N cores using MPI parallelization (not working with all samples)
+- make clean: to clean build
+
 Author of this project is Jukka Räbinä, who currently works in the 
 - Faculty of Information Technology at the University of Jyväskylä.
 
