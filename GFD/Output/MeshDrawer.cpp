@@ -32,6 +32,19 @@ void MeshDrawer::drawPrimalEdges(const Mesh &mesh, const Vector3 &col, const Uin
 	}
 }
 
+void MeshDrawer::drawPrimalEdges(const Mesh& mesh, const Buffer<Vector3>& col, const UintSet& flag)
+{
+	uint i;
+	for (i = 0; i < mesh.getEdgeSize(); i++)
+	{
+		if (!flag.includes(mesh.getEdgeFlag(i))) continue;
+		const Buffer<uint>& en = mesh.getEdgeNodes(i);
+		const Vector4 p0 = mesh.getNodePosition(en[0]);
+		const Vector4 p1 = mesh.getNodePosition(en[1]);
+		drawLine(p0, p1, col[i]);
+	}
+}
+
 void MeshDrawer::drawDualEdges(const Mesh &mesh, const Vector3 &col, const UintSet &flag)
 {
 	uint i;

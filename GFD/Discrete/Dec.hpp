@@ -23,6 +23,8 @@ public:
 	void setLowDimension(const uint lowdim);
 	void setHighDimension(const uint highdim);
 
+	Diagonal<bool> &integrateFlags(const FormGrade grade, const UintSet &flag, Diagonal<bool> &result) const;
+
 	Sparse<sign> &integrateDerivative(const FormGrade grade, Sparse<sign> &result) const;
 	Sparse<sign> &integrateDerivative(const FormGrade grade, const UintSet &flag, Sparse<sign> &result) const;
 	Sparse<double> &integrateCurvatureDerivative(SymMatrix4 curv(const Vector4 &), const FormGrade grade, const UintSet &flag, Sparse<double> &result) const;
@@ -31,6 +33,7 @@ public:
 		MeshIntegrator intg(m_mesh, grade, 0, m_lowdim, m_highdim);
 		const uint locs = intg.getLocals();
 		initResult(locs, result);
+		return result;
 	}
 	template<typename T> Column<T> &integrateForm(T func(const Buffer<double> &), const int num, const FormGrade grade, Column<T> &result) const {
 		MeshIntegrator intg(m_mesh, grade, num, m_lowdim, m_highdim);
@@ -319,6 +322,21 @@ public:
 		}
 		shareExternals(ext, extval, result.m_val);
 		return result;
+	}
+	template<typename T> void getFullBuffer(const FormGrade grade, const Column<T> &val, Buffer<T> &result) {
+		MeshIntegrator intg(m_mesh, grade, 0, m_lowdim, m_highdim);
+		const Buffer< pair<uint,uint> > &ext = intg.getExternals();
+		result = val.getBuffer();
+		result.resize(val.m_height + ext.size());
+		const Buffer< pair<uint,uint> > mext = getMyExternals(ext);
+		const uint rank = getMPIrank();
+		for(uint i=0; i<mext.size(); i++) {
+			sendMPI(&result[mext[i].second], sizeof(T), mext[i].first, 0);
+		}
+		for(uint i=0; i<ext.size(); i++) {
+			if(ext[i].first == rank) result[val.m_height + i] = result[ext[i].second];
+			else recvMPI(&result[val.m_height + i], sizeof(T), ext[i].first, 0);
+		}
 	}
 
 protected:

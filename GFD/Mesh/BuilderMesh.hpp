@@ -92,16 +92,6 @@ public:
 	void optimizeNodes(const UintSet &flag = UINTSETALL, const uint iterations = 100, const bool position = true, const bool weight = true);
 	bool optimizeNodesIteration(const Buffer<uint> &n, const bool position = true, const bool weight = true);
 
-	// neighbors for advanced use only
-	void setNodeEdges(const uint n, const Buffer<uint> &e) { m_n[n].e = e; }
-	void setEdgeNodes(const uint e, const Buffer<uint> &n) { m_e[e].n = n; }
-	void setEdgeFaces(const uint e, const Buffer<uint> &f) { m_e[e].f = f; }
-	void setFaceEdges(const uint f, const Buffer<uint> &e) { m_f[f].e = e; }
-	void setFaceBodies(const uint f, const Buffer<uint> &b) { m_f[f].b = b; }
-	void setBodyFaces(const uint b, const Buffer<uint> &f) { m_b[b].f = f; }
-	void setBodyQuads(const uint b, const Buffer<uint> &q) { m_b[b].q = q; }
-	void setQuadBodies(const uint q, const Buffer<uint> &b) { m_q[q].b = b; }
-
 protected:
 
 	// stretch mesh

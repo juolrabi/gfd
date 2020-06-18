@@ -36,6 +36,18 @@ public:
 	uint getBodyLocals() const { return m_bsize - m_extb.size(); }
 	uint getQuadLocals() const { return m_qsize - m_extq.size(); }
 
+	void setNodePart(const uint i, const uint part) { const uint j = i - getNodeLocals(); if(j < m_extn.size()) m_extn[j].first = part; }
+	void setEdgePart(const uint i, const uint part) { const uint j = i - getEdgeLocals(); if(j < m_exte.size()) m_exte[j].first = part; }
+	void setFacePart(const uint i, const uint part) { const uint j = i - getFaceLocals(); if(j < m_extf.size()) m_extf[j].first = part; }
+	void setBodyPart(const uint i, const uint part) { const uint j = i - getBodyLocals(); if(j < m_extb.size()) m_extb[j].first = part; }
+	void setQuadPart(const uint i, const uint part) { const uint j = i - getQuadLocals(); if(j < m_extq.size()) m_extq[j].first = part; }
+
+	void setNodeLink(const uint i, const uint link) { const uint j = i - getNodeLocals(); if(j < m_extn.size()) m_extn[j].second = link; }
+	void setEdgeLink(const uint i, const uint link) { const uint j = i - getEdgeLocals(); if(j < m_exte.size()) m_exte[j].second = link; }
+	void setFaceLink(const uint i, const uint link) { const uint j = i - getFaceLocals(); if(j < m_extf.size()) m_extf[j].second = link; }
+	void setBodyLink(const uint i, const uint link) { const uint j = i - getBodyLocals(); if(j < m_extb.size()) m_extb[j].second = link; }
+	void setQuadLink(const uint i, const uint link) { const uint j = i - getQuadLocals(); if(j < m_extq.size()) m_extq[j].second = link; }
+
 	uint getNodePart(const uint i) const { const uint j = i - getNodeLocals(); if(j < m_extn.size()) return m_extn[j].first; return m_part; }
 	uint getEdgePart(const uint i) const { const uint j = i - getEdgeLocals(); if(j < m_exte.size()) return m_exte[j].first; return m_part; }
 	uint getFacePart(const uint i) const { const uint j = i - getFaceLocals(); if(j < m_extf.size()) return m_extf[j].first; return m_part; }

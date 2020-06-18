@@ -400,6 +400,7 @@ class VectorN : public Vector<VectorN>
 {
 public:
 	VectorN() {}
+	VectorN(const uint size, const double v) : val(size, v) {}
 	VectorN(const double v) {
 		val.resize(1);
 		val[0] = v;

@@ -75,6 +75,8 @@ public:
 	template<typename R> Diagonal &operator-=(const Diagonal<R> &r) { return setMinus(*this, r); }
 	template<typename R> Diagonal &operator*=(const Diagonal<R> &r) { return setTimes(*this, r); }
 	template<typename R> Diagonal &scale(const R &r) { return setScale(*this, r); }
+	Diagonal &negate() { return setNegation(*this); }
+	Diagonal &invert() { return setInverse(*this); }
 
 	// trim functions
 	Diagonal &trimFull() { Discrete<T>::trimFull(); return *this; } // convert sparse to full
@@ -85,6 +87,11 @@ public:
 	// get functions
 	Buffer<T> getBuffer() const { return Discrete<T>::getBuffer(); } // return diagonal values in the format of Buffer<T>
 	const T &getValue(const uint i) const { return Discrete<T>::getValue(i); }
+	template<typename R> double getDot(const Diagonal<R> &r) const { return Discrete<T>::getDot(r); }
+	template<typename R> double getDotDot(const Diagonal<R> &r) const { return Discrete<T>::getDotDot(r); }
+	double getLensq() const { return Discrete<T>::getLensq(); }
+	double getLensqDot() const { return Discrete<T>::getLensqDot(); }
+	template<typename R> double getProduct(const Diagonal<R> &r, double func(const T &, const R &)) const { return Discrete<T>::getProduct(r, func); }
 
 };
 
@@ -108,6 +115,10 @@ template<typename L, typename R, typename O = decltype(declval<L &>() * declval<
 template<typename L, typename R, typename O = decltype(declval<L &>() * declval<R &>())> Diagonal<O> scaled(const L &l, const Diagonal<R> &r) {
 	Diagonal<O> o(l * r.m_zero);
 	return o.setScale(l, r);
+}
+template<typename R> Diagonal<R> inverse(const Diagonal<R> &r) {
+	Diagonal<R> o(r.m_zero);
+	return o.setInverse(r);
 }
 template<typename R> Diagonal<R> operator-(const Diagonal<R> &r) {
 	Diagonal<R> o(r.m_zero);

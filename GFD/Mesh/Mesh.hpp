@@ -255,6 +255,16 @@ public:
 	uint findBody(const Buffer<uint> &f) const;
 	uint findQuad(const Buffer<uint> &b) const;
 
+	// neighbors for advanced use only
+	void setNodeEdges(const uint n, const Buffer<uint> &e) { m_n[n].e = e; }
+	void setEdgeNodes(const uint e, const Buffer<uint> &n) { m_e[e].n = n; }
+	void setEdgeFaces(const uint e, const Buffer<uint> &f) { m_e[e].f = f; }
+	void setFaceEdges(const uint f, const Buffer<uint> &e) { m_f[f].e = e; }
+	void setFaceBodies(const uint f, const Buffer<uint> &b) { m_f[f].b = b; }
+	void setBodyFaces(const uint b, const Buffer<uint> &f) { m_b[b].f = f; }
+	void setBodyQuads(const uint b, const Buffer<uint> &q) { m_b[b].q = q; }
+	void setQuadBodies(const uint q, const Buffer<uint> &b) { m_q[q].b = b; }
+
 	// flags
 	uint getNodeFlag(const uint i) const { if(i < m_nflag.size()) return m_nflag[i]; return 0; }
 	uint getEdgeFlag(const uint i) const { if(i < m_eflag.size()) return m_eflag[i]; return 0; }

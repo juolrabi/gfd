@@ -53,6 +53,36 @@ void Dec::combineExternals(const Buffer< pair<uint,uint> > &ext, Buffer<Quadratu
 	}
 }
 
+Diagonal<bool> &Dec::integrateFlags(const FormGrade grade, const UintSet &flag, Diagonal<bool> &result) const {
+	switch(FormGradeDimension(grade)) {
+	case 0: {
+		initResult(m_mesh.getNodeLocals(), result);
+		for(uint i=0; i<result.m_val.size(); i++) result.m_val[i] = flag.includes(m_mesh.getNodeFlag(i));
+		return result;
+	}
+	case 1: {
+		initResult(m_mesh.getEdgeLocals(), result);
+		for(uint i=0; i<result.m_val.size(); i++) result.m_val[i] = flag.includes(m_mesh.getEdgeFlag(i));
+		return result;
+	}
+	case 2: {
+		initResult(m_mesh.getFaceLocals(), result);
+		for(uint i=0; i<result.m_val.size(); i++) result.m_val[i] = flag.includes(m_mesh.getFaceFlag(i));
+		return result;
+	}
+	case 3: {
+		initResult(m_mesh.getBodyLocals(), result);
+		for(uint i=0; i<result.m_val.size(); i++) result.m_val[i] = flag.includes(m_mesh.getBodyFlag(i));
+		return result;
+	}
+	default: {
+		initResult(m_mesh.getQuadLocals(), result);
+		for(uint i=0; i<result.m_val.size(); i++) result.m_val[i] = flag.includes(m_mesh.getQuadFlag(i));
+		return result;
+	}
+	}
+}
+
 Sparse<sign> &Dec::integrateDerivative(const FormGrade grade, Sparse<sign> &result) const
 {
 	uint i, j;

@@ -137,6 +137,61 @@ public:
 		this->m_val.swap(val);
 		return *this;
 	}
+	template<typename R> Column &setRowLensq(const Sparse<R> &r) {
+		uint i, j, k, n;
+		Buffer<T> val(r.m_beg.size(), this->m_zero);
+		// local terms
+		i = r.m_beg.size();
+		j = r.m_col.size();
+		while(i > 0) {
+			--i;
+			while(j > r.m_beg[i]) { --j; val[i] += r.m_val[j] * r.m_val[j]; }
+		}
+		// receive terms
+		for(i=0,n=0; i<r.m_recv.size(); ) {
+			i++;
+			j = r.m_recv[i++];
+			while(j > 0) {
+				--j;
+				for(k=r.m_recv[i++]; k>0; k--,i++,n++) val[r.m_recv[i]] += r.m_rval[n] * r.m_rval[n];
+			}
+		}
+		this->m_height = r.m_height;
+		this->m_full = r.m_full;
+		this->m_row = r.m_row;
+		this->m_val.swap(val);
+		return *this;
+	}
+	template<typename R> Column &setRowMaxAbs(const Sparse<R> &r) {
+		uint i, j, k, n;
+		Buffer<T> val(r.m_beg.size(), this->m_zero);
+		// local terms
+		i = r.m_beg.size();
+		j = r.m_col.size();
+		while(i > 0) {
+			--i;
+			while(j > r.m_beg[i]) { 
+				--j; 
+				if(val[i] < abs(r.m_val[j])) val[i] = abs(r.m_val[j]);
+			}
+		}
+		// receive terms
+		for(i=0,n=0; i<r.m_recv.size(); ) {
+			i++;
+			j = r.m_recv[i++];
+			while(j > 0) {
+				--j;
+				for(k=r.m_recv[i++]; k>0; k--,i++,n++) {
+					if(val[r.m_recv[i]] < abs(r.m_rval[n])) val[r.m_recv[i]] = abs(r.m_rval[n]);
+				}
+			}
+		}
+		this->m_height = r.m_height;
+		this->m_full = r.m_full;
+		this->m_row = r.m_row;
+		this->m_val.swap(val);
+		return *this;
+	}
 	template<typename L, typename R> Column &setScale(const Diagonal<L> &l, const R &r) { Discrete<T>::setScale(l, r); return *this; }
 	template<typename L, typename R> Column &setScale(const L &l, const Diagonal<R> &r) { Discrete<T>::setScale(l, r); return *this; }
 
@@ -144,6 +199,7 @@ public:
 	template<typename R> Column &operator+=(const Diagonal<R> &r) { return setPlus(*this, r); }
 	template<typename R> Column &operator-=(const Diagonal<R> &r) { return setMinus(*this, r); }
 	template<typename R> Column &scale(const R &r) { return setScale(*this, r); }
+	Column &negate() { return setNegation(*this); }
 
 	// trim functions
 	Column &trimFull() { Discrete<T>::trimFull(); return *this; } // convert sparse to full

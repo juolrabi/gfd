@@ -22,6 +22,7 @@ template<typename T,typename L,typename R> T functionTimes(const L &l, const R &
 template<typename T,typename L,typename R> T functionDividedBy(const L &l, const R &r) { return l / r; }
 template<typename T,typename L,typename R> T functionReversePlus(const R &r, const L &l) { return l + r; }
 template<typename T,typename L,typename R> T functionReverseMinus(const R &r, const L &l) { return l - r; }
+template<typename L,typename R> double functionDot(const L &l, const R &r) { return l.dot(r); }
 
 template<typename T>
 class Discrete
@@ -33,13 +34,6 @@ public:
 		m_full = true;
 	}
 	virtual ~Discrete() { }
-
-	// initializers
-	const T &getZero() const { return m_zero; }
-	uint getSize() const { return m_height; }
-	bool isFull() const { return m_full; }
-	const Buffer<uint> &getRow() const { return m_row; }
-	const Buffer<T> &getVal() const { return m_val; }
 
 	// all variables are public
 	T m_zero; // template zero value
@@ -147,7 +141,7 @@ protected:
 			}
 			// only l is a full column vector
 			uint ri = 0;
-			if(this == &r) {
+			if(this == (void*)&r) {
 				Buffer<T> val(l.m_height);
 				while(ri < r.m_row.size()) {
 					while(i < r.m_row[ri]) { val[i] = func(l.m_val[i], r.m_zero); i++; }
@@ -169,7 +163,7 @@ protected:
 		}
 		if(r.m_full) { // only r is a full column vector
 			uint li = 0;
-			if(this == &l) {
+			if(this == (void*)&l) {
 				Buffer<T> val(r.m_height);
 				while(li < l.m_row.size()) {
 					while(i < l.m_row[li]) { val[i] = func(l.m_zero, r.m_val[i]); i++; }
@@ -331,6 +325,42 @@ protected:
 		}
 		else if(!searchIndex(i, m_row, 0, m_row.size())) return m_zero;
 		return m_val[i];
+	}
+	template<typename R> double getDot(const Discrete<R> &r) const { return getProduct(r, functionTimes<double,T,R>); }
+	template<typename R> double getDotDot(const Discrete<R> &r) const { return getProduct(r, functionDot); }
+	double getLensq() const { return getProduct(*this, functionTimes<double,T,T>); }
+	double getLensqDot() const { return getProduct(*this, functionDot); }
+	template<typename R> double getProduct(const Discrete<R> &r, double func(const T &, const R &)) const {
+		if(orMPI(m_height != r.m_height)) return 0.0; // the heights do not match
+		uint i, j;
+		double sum = 0.0;
+		if(this == (void*)&r) { // self operation
+			for(i=0; i<m_val.size(); i++) sum += func(m_val[i], m_val[i]);
+			sumMPI(&sum, 1);
+			return sum;
+		}
+		else if(m_full) {
+			if(r.m_full) { // both this and r are full column vectors
+				for(i=0; i<m_height; i++) sum += func(m_val[i], r.m_val[i]);
+			}
+			else { // only this is a full column vector
+				for(i=0; i<r.m_row.size(); i++) sum += func(m_val[r.m_row[i]], r.m_val[i]);
+			}
+		}
+		else {
+			if(r.m_full) { // only r is a full column vector
+				for(i=0; i<m_row.size(); i++) sum += func(m_val[i], r.m_val[m_row[i]]);
+			}
+			else { // both this and r are sparse column vectors
+				for(i=0,j=0; i<m_row.size(); i++) {
+					while(j < r.m_row.size() && r.m_row[j] < m_row[i]) j++;
+					if(j >= r.m_row.size()) break;
+					if(r.m_row[j] == m_row[i]) sum += func(m_val[i], r.m_val[j]);
+				}
+			}
+		}
+		sumMPI(&sum, 1);
+		return sum;
 	}
 	Buffer<T> getBuffer() const {
 		if(m_full) return m_val;

@@ -26,6 +26,8 @@ public:
 	Uint2 &operator*=(const uint j) { x *= j; y *= j; return (*this); }
 	Uint2 operator*(const uint j) const { return Uint2(j * x, j * y); }
 	friend Uint2 operator*(const uint j, const Uint2 &i) { return i * j; }
+	bool operator==(const Uint2 &v) const { return x == v.x && y == v.y; }
+	bool operator!=(const Uint2 &v) const { return x != v.x || y != v.y; }
 
 	uint x;
 	uint y;
@@ -45,6 +47,8 @@ public:
 	Uint3 &operator*=(const uint j) { x *= j; y *= j; z *= j; return (*this); }
 	Uint3 operator*(const uint j) const { return Uint3(j * x, j * y, j * z); }
 	friend Uint3 operator*(const uint j, const Uint3 &i) { return i * j; }
+	bool operator==(const Uint3 &v) const { return x == v.x && y == v.y && z == v.z; }
+	bool operator!=(const Uint3 &v) const { return x != v.x || y != v.y || z != v.z; }
 
 	Uint2 toUint2() const {	return Uint2(x, y); }
 
@@ -68,6 +72,8 @@ public:
 	Uint4 &operator*=(const uint j) { x *= j; y *= j; z *= j; t *= j; return (*this); }
 	Uint4 operator*(const uint j) const { return Uint4(j * x, j * y, j * z, j * t); }
 	friend Uint4 operator*(const uint j, const Uint4 &i) { return i * j; }
+	bool operator==(const Uint4 &v) const { return x == v.x && y == v.y && z == v.z && t == v.t; }
+	bool operator!=(const Uint4 &v) const { return x != v.x || y != v.y || z != v.z || t != v.t; }
 
 	Uint2 toUint2() const {	return Uint2(x, y); }
 	Uint3 toUint3() const {	return Uint3(x, y, z); }

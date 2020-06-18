@@ -203,7 +203,7 @@ public:
 		return setCommunication(ext, extv, srank, rrank);
 	}
 	template<typename R> Sparse &setCopy(const Sparse<R> &r) {
-		if(this == &r) return *this;
+		if(this == (void*)&r) return *this;
 		setShape(r);
 		uint i;
 		for(i=0; i<this->m_val.size(); i++) this->m_val[i] = r.m_val[i];
@@ -218,6 +218,16 @@ public:
 		for(uint i=0; i<m_beg.size(); i++) m_beg[i] = i;
 		if(r.m_full) m_col = m_beg;
 		else m_col = r.m_row;
+		return *this;
+	}
+	template<typename R> Sparse &setColumn(const Diagonal<R> &r) { // härö: this function is wrong
+		setEmpty(); 
+		Discrete<T>::setCopy(r);
+		m_width = 1;
+		m_beg.resize(r.m_val.size());
+		for(uint i=0; i<m_beg.size(); i++) m_beg[i] = i;
+		m_col.resize(m_beg.size());
+		m_col.fill(0);
 		return *this;
 	}
 	template<typename R> Sparse &setFunction(const Sparse<R> &r, T func(const R &)) {
@@ -321,12 +331,13 @@ public:
 		rval.clear();
 		comm.clear();
 		// initialize matrix shape
+		const bool rfull = r.m_full;
 		const uint rwidth = r.m_width;
 		m_width = r.m_height;
 		this->m_height = rwidth;
 		this->m_full = true;
 		this->m_row.clear();
-		if(r.m_full) return *this;
+		if(rfull) return *this;
 		return toSparse();
 	}
 	template<typename L, typename R> Sparse &setUnion(const Sparse<L> &l, const Sparse<R> &r, T func(const L &, const R &)) {
@@ -827,7 +838,12 @@ public:
 		srank.resize(sranks);
 		rrank.resize(rranks);
 		// initialize the product matrix
-		setFull(r.m_width, buf, bext, srank, rrank);
+		if(l.m_full) setFull(r.m_width, buf, bext, srank, rrank);
+		else {
+			Buffer< Buffer< pair<uint,T> > > fbuf(l.m_height);
+			for(i=0; i<buf.size(); i++) fbuf[l.m_row[i]].swap(buf[i]);
+			setFull(r.m_width, fbuf, bext, srank, rrank);
+		}
 		if(l.m_full && r.m_full) return *this;
 		return toSparse();
 	}
@@ -1052,6 +1068,65 @@ public:
 		m_rval.resize(rvals);
 		return toSparse();
 	}
+	template<typename L, typename R> Sparse &setOuter(const Diagonal<L> &l, const Diagonal<R> &r) {
+		uint i, j, k;
+		const uint irank = getMPIrank();
+		const uint ranks = getMPIranks();
+		// send r data to all neighbors
+		for(i=0; i<ranks; i++) {
+			if(i == irank) continue;
+			j = r.m_val.size();
+			sendMPI(&j, sizeof(uint), i, 0);
+			if(j == 0) continue;
+			sendMPI(&r.m_val[0], j * sizeof(R), i, 0);
+			if(r.m_full) continue;
+			sendMPI(&r.m_row[0], j * sizeof(uint), i, 0);
+		}
+		// receive r data from all neighbors
+		Buffer< pair<uint,R> > rval(r.m_val.size());
+		for(k=0; k<rval.size(); k++) rval[k] = pair<uint,R>((r.m_full ? k : r.m_row[k]), r.m_val[k]);
+		Buffer< pair<uint,uint> > ext;
+		for(i=0; i<ranks; i++) {
+			if(i == irank) continue;
+			recvMPI(&j, sizeof(uint), i, 0);
+			if(j == 0) continue;
+			const uint rvals = rval.size();
+			const uint exts = ext.size();
+			Buffer<R> ival(j);
+			recvMPI(&ival[0], j * sizeof(R), i, 0);
+			rval.resize(rvals + j);
+			for(k=0; k<j; k++) rval[rvals + k] = pair<uint,R>(r.m_height + exts + k, ival[k]);
+			ext.resize(exts + j);
+			if(r.m_full) {
+				for(k=0; k<j; k++) ext[exts + k] = pair<uint,uint>(i,k);
+				continue;
+			}
+			Buffer<uint> iext(j);
+			recvMPI(&iext[0], j * sizeof(uint), i, 0);
+			for(k=0; k<j; k++) ext[exts + k] = pair<uint,uint>(i,iext[k]);
+		}
+		if(l.m_full) {
+			Buffer< Buffer< pair<uint,T> > > val(l.m_height);
+			for(i=0; i<val.size(); i++) {
+				Buffer< pair<uint,T> > &ival = val[i];
+				ival.resize(rval.size());
+				for(j=0; j<rval.size(); j++) {
+					ival[j] = pair<uint,T>(rval[j].first, l.m_val[i] * rval[j].second);
+				}
+			}
+			return setFull(r.m_height, val, ext);
+		}
+		Buffer< pair<uint,Buffer< pair<uint,T> > > > val(l.m_row.size());
+		for(i=0; i<val.size(); i++) {
+			pair<uint,Buffer< pair<uint,T> > > &ival = val[i];
+			ival.first = l.m_row[i];
+			ival.second.resize(rval.size());
+			for(j=0; j<rval.size(); j++) {
+				ival.second[j] = pair<uint,T>(rval[j].first, l.m_val[i] * rval[j].second);
+			}
+		}
+		return setSparse(r.m_height, l.m_height, val, ext);
+	}
 	template<typename L, typename R> Sparse &setScale(const Sparse<L> &l, const R &r) {
 		if(this != (void*)&l) setShape(l);
 		uint i;
@@ -1070,9 +1145,12 @@ public:
 	// modifier functions
 	template<typename R> Sparse &operator+=(const Sparse<R> &r) { return setPlus(*this, r); }
 	template<typename R> Sparse &operator-=(const Sparse<R> &r) { return setMinus(*this, r); }
+	template<typename R> Sparse &operator+=(const Diagonal<R>& r) { return setPlus(*this, r); }
+	template<typename R> Sparse &operator-=(const Diagonal<R>& r) { return setMinus(*this, r); }
 	template<typename R> Sparse &operator*=(const Sparse<R> &r) { return setTimes(*this, r); }
 	template<typename R> Sparse &operator*=(const Diagonal<R> &r) { return setTimes(*this, r); } // multiply from right by a diagonal matrix
 	template<typename R> Sparse &scale(const R &r) { return setScale(*this, r); } // multiply from right by a scalar
+	Sparse &negate() { return setNegation(*this); }
 
 	// trim functions
 	Sparse &trimFull() { // convert sparse to full
@@ -1433,6 +1511,10 @@ template<typename L, typename R, typename O = decltype(declval<L &>() * declval<
 template<typename L, typename R, typename O = decltype(declval<L &>() * declval<R &>())> Sparse<O> scaled(const L &l, const Sparse<R> &r) {
 	Sparse<O> o(l * r.m_zero);
 	return o.setScale(l, r);
+}
+template<typename R> Sparse<R> transpose(const Sparse<R>& r) {
+	Sparse<R> o(r.m_zero);
+	return o.setTranspose(r);
 }
 template<typename R> Sparse<R> operator-(const Sparse<R> &r) {
 	Sparse<R> o(r.m_zero);

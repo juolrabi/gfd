@@ -1276,7 +1276,7 @@ void BlockMesh::toMesh(PartMesh &mesh) const
 	Uint4 i;
 	uint j, k, l;
 	Buffer<uint> link;
-	const PartMesh *part;
+	const PartMesh *part = NULL;
 
 	// add local nodes
 	mesh.resizeNodeBuffer(m_nsize);

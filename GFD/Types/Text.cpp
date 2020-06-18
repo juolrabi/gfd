@@ -20,7 +20,7 @@ bool Text::load(const std::string &path)
 
 	// get size of the file
 	fs.seekg(0, std::ios::end);
-	const uint size = fs.tellg();
+	const uint size = uint(fs.tellg());
 	fs.seekg(0, std::ios::beg);
 
 	if(size > 0) {
@@ -45,7 +45,7 @@ bool Text::save(const std::string &path)
 
 	// get size of *this
 	seekg(0, std::ios::end);
-	const uint size = tellg();
+	const uint size = uint(tellg());
 	seekg(0, std::ios::beg);
 
 	if(size > 0) {
@@ -79,3 +79,12 @@ const std::string Text::getRow()
 	getline(str, MAXLINEWIDTH);
 	return str;
 }
+/*
+Buffer<double> Text::toDoubles(const std::string &s) {
+	Buffer<double> buf;
+	double d = 0.0;
+	std::stringstream ss(s);
+    while (ss >> d) buf.push_back(d);
+	return buf;
+}
+*/
