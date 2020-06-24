@@ -33,7 +33,7 @@ protected:
 	Buffer< SparseSplit<double> > m_d; // derivatives
 	Buffer< DiagonalSplit<double> > m_a; // absorption terms
 	Buffer< DiagonalSplit<double> > m_e; // emission terms
-	Buffer< Column<double> > m_v; // emission vector
+	Buffer< ColumnSplit<double> > m_v; // emission vector
 	Buffer< ColumnSplit<double> > m_f; // source terms
 
 /*	Buffer< Sparse<double> > m_d; // derivatives

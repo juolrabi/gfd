@@ -137,6 +137,86 @@ public:
 		this->m_val.swap(val);
 		return *this;
 	}
+	template<typename L, typename R> Column &setIntersection(const Sparse<L> &l, const Diagonal<R> &r, void func(T &, const L &, const R &)) {
+		if(orMPI(l.m_width != r.m_height)) { Discrete<T>::setEmpty(); return *this; } // the dimensions do not match
+		uint i, j, k, n;
+		Buffer<T> val(l.m_beg.size(), this->m_zero);
+		if(r.m_full) {
+			// send terms
+			for(i=0; i<l.m_send.size(); ) {
+				const uint ranki = l.m_send[i++];
+				Buffer<R> vali(j = l.m_send[i++]);
+				while(j > 0) vali[--j] = r.m_val[l.m_send[i++]];
+				sendMPI(&vali[0], vali.size() * sizeof(R), ranki, 0);
+			}
+			// local terms
+			i = l.m_beg.size();
+			j = l.m_col.size();
+			while(i > 0) {
+				T &sum = val[--i];
+				while(j > l.m_beg[i]) { --j; func(sum, l.m_val[j], r.m_val[l.m_col[j]]); }
+			}
+			// receive terms
+			for(i=0,n=0; i<l.m_recv.size(); )	{
+				const uint ranki = l.m_recv[i++];
+				Buffer<R> vali(j = l.m_recv[i++]);
+				recvMPI(&vali[0], vali.size() * sizeof(R), ranki, 0);
+				while(j > 0) {
+					const R &valj = vali[--j];
+					for(k=l.m_recv[i++]; k>0; k--,i++,n++) func(val[l.m_recv[i]], l.m_rval[n], valj);
+				}
+			}
+		}
+		else {
+			// send sparse data
+			for(i=0; i<l.m_send.size(); ) {
+				const uint ranki = l.m_send[i++];
+				uint vals = 0;
+				Buffer<pair<uint,R> > vali(l.m_send[i++]);
+				for(j=0; j<vali.size(); j++) {
+					uint row = l.m_send[i++];
+					if(!Discrete<T>::searchIndex(row, r.m_row, 0, r.m_row.size())) continue;
+					vali[vals++] = pair<uint,R>(j, r.m_val[row]);
+				}
+				sendMPI(&vals, sizeof(uint), ranki, 0);
+				if(vals > 0) sendMPI(&vali[0], vals * sizeof(pair<uint,R>), ranki, 1);
+			}
+			// local terms
+			i = l.m_beg.size();
+			j = l.m_col.size();
+			while(i > 0) {
+				T &sum = val[--i];
+				uint lastcol = r.m_row.size();
+				while(j > l.m_beg[i]) {
+					uint col = l.m_col[--j];
+					if(!Discrete<T>::searchIndex(col, r.m_row, 0, lastcol)) continue;
+					func(sum, l.m_val[j], r.m_val[col]);
+					lastcol = col;
+				}
+			}
+			// receive sparse data
+			for(i=0,n=0; i<l.m_recv.size(); )	{
+				const uint ranki = l.m_recv[i++];
+				const uint sizei = l.m_recv[i++];
+				uint vals;
+				recvMPI(&vals, sizeof(uint), ranki, 0);
+				if(vals > 0) {
+					Buffer<pair<uint,R> > vali(vals);
+					recvMPI(&vali[0], vals * sizeof(pair<uint,R>), ranki, 1);
+					for(j=0,vals=0; j<vali.size(); j++,vals++) {
+						while(vals < vali[j].first) { n += l.m_recv[i]; i += 1 + l.m_recv[i]; vals++; } // idle for the next
+						for(k=l.m_recv[i++]; k>0; k--,i++,n++) func(val[l.m_recv[i]], l.m_rval[n], vali[j].second);
+					}
+				}
+				while(vals < sizei) { n += l.m_recv[i]; i += 1 + l.m_recv[i]; vals++; } // idle for the next
+			}
+		}
+		this->m_height = l.m_height;
+		this->m_full = l.m_full;
+		this->m_row = l.m_row;
+		this->m_val.swap(val);
+		return *this;
+	}
 	template<typename R> Column &setRowLensq(const Sparse<R> &r) {
 		uint i, j, k, n;
 		Buffer<T> val(r.m_beg.size(), this->m_zero);

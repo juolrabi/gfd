@@ -75,6 +75,7 @@ double functionDivision(const Couple<Vector2> &v) {
 int main()
 {
 	initMPI();
+	auto starttime = chrono::system_clock::now();
 
 	// 2d
 	const uint w = 21;
@@ -85,7 +86,7 @@ int main()
 		const uint ii = (i-10) * (i-10);
 		for(uint j=0; j<w; j++) {
 			const uint jj = (j-10) * (j-10);
-			if(ii + jj < 7) data[j * w + i] = 11;
+			if(ii + jj < 7) data[j * w + i] = 5;
 			//else if(ii + jj < 25) data[j * w + i] = 4;
 		}
 	}
@@ -489,7 +490,9 @@ int main()
 		pic0.save("kuva.bmp", true);
 	}
 */
+	if(getMPIrank() == 0) cout << "Elapsed time: " << chrono::duration<double>(chrono::system_clock::now() - starttime).count() << " seconds" << endl;
 	finalizeMPI();
+
 
     return 0;
 }
