@@ -135,9 +135,9 @@ int main() {
 	Column<double> v(0.0);
 	dec.integrateZeroForm(fg_prim2, v);
 	Column<double> a(0.0);
-	dec.integrateForm(funcA, 2, fg_prim1, a);
+	dec.integrateForm(funcA, 20, fg_prim1, a);
 	Column<double> b(0.0);
-	dec.integrateForm(funcB, 2, fg_prim1, UintSet(0), b);
+	dec.integrateForm(funcB, 20, fg_prim1, UintSet(0), b);
 
 	// integrate forward in time
 	for(uint i=0; i<time_steps; i++) {
@@ -161,9 +161,9 @@ int main() {
 	// here we compare discrete forms
 	// if you want to compare continuous fields, choose interpolation strategy and then compare interpolated fields
 	Column<double> u0(0.0);
-	dec.integrateForm(funcU, 2, fg_prim1, u0);
+	dec.integrateForm(funcU, 20, fg_prim1, u0);
 	Column<double> v0(0.0);
-	dec.integrateForm(funcV, 2, fg_prim2, v0);
+	dec.integrateForm(funcV, 20, fg_prim2, v0);
 	Diagonal<double> h1;
 	h1i.trimSparse();
 	h1.setInverse(h1i);
